@@ -27,3 +27,56 @@ jobs:
         env:
           NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder
+
+  isolamento-db:
+    name: Isolamento entre tenants (RLS no Postgres)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/connecta_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: sudo apt-get install -y -q postgresql-client
+      - run: scripts/db-reset-local.sh
+      - run: npm run test:isolation:db
+
+  isolamento-api:
+    name: Isolamento entre tenants (via API Supabase)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - run: npm ci
+      - name: Sobe Supabase local (aplica as migrations)
+        run: supabase start -x studio,imgproxy,edge-runtime,logflare,vector,supavisor,mailpit
+      - name: Exporta credenciais locais (efêmeras, geradas pelo CLI)
+        run: |
+          supabase status -o env > /tmp/sb.env
+          set -a; . /tmp/sb.env; set +a
+          echo "SUPABASE_URL=$API_URL" >> "$GITHUB_ENV"
+          echo "SUPABASE_ANON_KEY=$ANON_KEY" >> "$GITHUB_ENV"
+          echo "::add-mask::$SERVICE_ROLE_KEY"
+          echo "SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY" >> "$GITHUB_ENV"
+          echo "SUPABASE_DB_URL=$DB_URL" >> "$GITHUB_ENV"
+      - run: npm run test:isolation:api
+        env:
+          REQUIRE_API_TESTS: "1"

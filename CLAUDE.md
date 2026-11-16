@@ -49,7 +49,7 @@ Realtime), Tailwind CSS.
 - [ ] índice começando por `tenant_id`
 - [ ] `alter table ... enable row level security;` (sem FORCE: as funções SECURITY DEFINER de contexto leem `memberships` como dono)
 - [ ] policies select/insert/update/delete usando `app.current_tenant_id()`
-- [ ] trigger `app.set_tenant_id()` (preenche/valida tenant pelo JWT)
+- [ ] trigger `app.enforce_tenant_id()` (preenche/valida tenant pelo JWT)
 - [ ] trigger de auditoria `app.audit_trigger()`
 - [ ] adicionada em `tests/isolation/`
 
