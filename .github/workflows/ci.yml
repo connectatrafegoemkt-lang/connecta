@@ -67,7 +67,7 @@ jobs:
           version: latest
       - run: npm ci
       - name: Sobe Supabase local (aplica as migrations)
-        run: supabase start -x studio,imgproxy,edge-runtime,logflare,vector,supavisor,mailpit
+        run: supabase start -x studio,imgproxy,edge-runtime,logflare,vector,supavisor
       - name: Exporta credenciais locais (efêmeras, geradas pelo CLI)
         run: |
           supabase status -o env > /tmp/sb.env
