@@ -107,12 +107,14 @@ create policy whatsapp_outbox_select on public.whatsapp_outbox for select to aut
 create policy whatsapp_outbox_insert on public.whatsapp_outbox for insert to authenticated
   with check (tenant_id = (select app.current_tenant_id()));
 
--- Grants: usuário só lê sessão/QR/fila e só INSERE (contact_id, body) na fila.
+-- Grants: usuário só lê sessão/QR/fila e só INSERE (tenant_id, contact_id, body) na fila.
 revoke all on public.whatsapp_auth_keys from authenticated;
 revoke insert, update, delete, truncate on public.whatsapp_sessions from authenticated;
 revoke insert, update, delete, truncate on public.whatsapp_qr from authenticated;
 revoke insert, update, delete, truncate on public.whatsapp_outbox from authenticated;
-grant insert (contact_id, body) on public.whatsapp_outbox to authenticated;
+-- tenant_id liberado porque a camada TenantDb sempre o envia; o trigger
+-- app.enforce_tenant_id rejeita qualquer valor diferente do tenant da sessão.
+grant insert (tenant_id, contact_id, body) on public.whatsapp_outbox to authenticated;
 
 -- ---------------------------------------------------------------------
 -- RPC: admin pede conexão/desconexão do WhatsApp DO PRÓPRIO tenant.

@@ -135,6 +135,16 @@ describe("fila de envio (outbox)", () => {
     expect(r.rows[0]).toEqual({ tenant_id: A.tenantId, status: "pendente" });
   });
 
+  it("insert com o tenant_id da própria sessão (como faz a camada TenantDb) funciona", async () => {
+    const r = await as({ userId: A.atendenteId }, (q) =>
+      q<{ tenant_id: string }>(
+        "insert into public.whatsapp_outbox (tenant_id, contact_id, body) values ($1, $2, 'via TenantDb') returning tenant_id",
+        [A.tenantId, A.contactId],
+      ),
+    );
+    expect(r.rows[0].tenant_id).toBe(A.tenantId);
+  });
+
   it("service_role não consegue ligar fila de A a contato de B (FK composta)", async () => {
     await expectDbError(
       as("service", (q) =>
