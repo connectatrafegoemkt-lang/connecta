@@ -14,6 +14,8 @@ export interface Task {
   completed_at: string | null;
   created_at: string;
   contacts?: { name: string } | null;
+  /** Calculado no servidor: pendente com prazo vencido. */
+  overdue?: boolean;
 }
 
 const COLS = "id, contact_id, title, description, status, due_at, remind_at, assigned_to, completed_at, created_at, contacts(name)";
@@ -28,7 +30,11 @@ export async function listTasks(ctx: TenantContext, opts: { status?: Task["statu
   if (opts.contact_id) q = q.eq("contact_id", opts.contact_id);
   const { data, error } = await q;
   if (error) throw fromDbError(error);
-  return data as unknown as Task[];
+  const now = Date.now();
+  return (data as unknown as Task[]).map((t) => ({
+    ...t,
+    overdue: t.status === "pendente" && !!t.due_at && new Date(t.due_at).getTime() < now,
+  }));
 }
 
 /** Lembretes vencidos do usuário (para notificação no painel). */
