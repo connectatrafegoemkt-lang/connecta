@@ -1,0 +1,44 @@
+# dependências
+node_modules/
+.pnp
+.pnp.js
+
+# build
+.next/
+out/
+build/
+dist/
+*.tsbuildinfo
+next-env.d.ts
+
+# testes
+coverage/
+test-results/
+playwright-report/
+
+# segredos — NUNCA commitar
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# sessões/credenciais do WhatsApp (nunca versionar)
+.wwebjs_auth/
+.wwebjs_cache/
+auth_info*/
+whatsapp-sessions/
+
+# supabase local
+supabase/.branches/
+supabase/.temp/
+supabase/.env
+
+# logs / SO / editores
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+.idea/
