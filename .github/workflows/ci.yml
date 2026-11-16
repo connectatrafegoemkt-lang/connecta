@@ -77,6 +77,16 @@ jobs:
           echo "::add-mask::$SERVICE_ROLE_KEY"
           echo "SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY" >> "$GITHUB_ENV"
           echo "SUPABASE_DB_URL=$DB_URL" >> "$GITHUB_ENV"
+      - name: Build e start do app Next.js apontando para o Supabase local
+        run: |
+          export NEXT_PUBLIC_SUPABASE_URL="$SUPABASE_URL" NEXT_PUBLIC_SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY"
+          npm run build
+          nohup npx next start -p 3000 > /tmp/next.log 2>&1 &
+          for i in $(seq 1 60); do curl -s -o /dev/null http://127.0.0.1:3000/login && break; sleep 1; done
+          echo "APP_URL=http://127.0.0.1:3000" >> "$GITHUB_ENV"
       - run: npm run test:isolation:api
         env:
           REQUIRE_API_TESTS: "1"
+      - name: Log do Next.js (em caso de falha)
+        if: failure()
+        run: tail -100 /tmp/next.log || true
