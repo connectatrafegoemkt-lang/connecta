@@ -102,3 +102,8 @@ export const memberUpdateSchema = z.strictObject({
 });
 
 export const idSchema = uuid;
+
+export const whatsappSendSchema = z.strictObject({
+  contact_id: uuid,
+  body: z.string().trim().min(1).max(4096),
+});
