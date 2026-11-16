@@ -93,8 +93,9 @@ jobs:
         run: |
           export WHATSAPP_CREDENTIALS_KEY=$(node -e "console.log(require('crypto').randomBytes(32).toString('base64'))")
           nohup npm run worker > /tmp/worker.log 2>&1 &
-          npx tsx tests/smoke/whatsapp-qr.ts
-          tail -20 /tmp/worker.log
+          status=0; npx tsx tests/smoke/whatsapp-qr.ts || status=$?
+          echo "----- log do worker -----"; tail -60 /tmp/worker.log
+          exit $status
       - name: Log do Next.js (em caso de falha)
         if: failure()
         run: tail -100 /tmp/next.log || true
