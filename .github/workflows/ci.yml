@@ -88,6 +88,13 @@ jobs:
       - run: npm run test:isolation:api
         env:
           REQUIRE_API_TESTS: "1"
+      - name: Smoke do worker do WhatsApp (gera QR real por tenant)
+        continue-on-error: true
+        run: |
+          export WHATSAPP_CREDENTIALS_KEY=$(node -e "console.log(require('crypto').randomBytes(32).toString('base64'))")
+          nohup npm run worker > /tmp/worker.log 2>&1 &
+          npx tsx tests/smoke/whatsapp-qr.ts
+          tail -20 /tmp/worker.log
       - name: Log do Next.js (em caso de falha)
         if: failure()
         run: tail -100 /tmp/next.log || true
