@@ -1,0 +1,5 @@
+{
+  "//": "O worker roda como ESM: o Baileys 7 e suas dependências são somente ESM.",
+  "type": "module",
+  "private": true
+}
