@@ -21,7 +21,13 @@ export function LoginForm() {
     });
     setLoading(false);
     if (error) {
-      setError("E-mail ou senha inválidos.");
+      // Só "credenciais inválidas" é culpa do usuário; o resto é problema de
+      // servidor/conexão e não deve parecer senha errada.
+      const wrongPassword = error.code === "invalid_credentials" || /invalid login credentials/i.test(error.message);
+      if (wrongPassword) setError("E-mail ou senha inválidos.");
+      else if (error.code === "email_not_confirmed") setError("E-mail ainda não confirmado. Fale com a CONNECTA.");
+      else if (error.status === 429) setError("Muitas tentativas. Aguarde alguns minutos e tente de novo.");
+      else setError("Não foi possível entrar agora (problema no servidor ou na conexão). Tente novamente ou fale com a CONNECTA.");
       return;
     }
     router.replace("/dashboard");
