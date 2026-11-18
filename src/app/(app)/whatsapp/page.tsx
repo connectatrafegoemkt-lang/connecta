@@ -9,12 +9,15 @@ import {
   listThread,
 } from "@/server/data/whatsapp";
 import { idSchema } from "@/server/validation";
+import { ExternalLink, Inbox, MessageCircle, MessageSquareText, Phone } from "lucide-react";
 import { dateTime, phoneFmt } from "@/components/format";
+import { PageHeader } from "@/components/page-header";
+import { EmptyState } from "@/components/empty-state";
 import { ConnectionPanel } from "./connection-panel";
 import { ChatThread } from "./chat-thread";
 import { LiveRefresh } from "./live-refresh";
 
-export const metadata = { title: "WhatsApp — CONNECTA CRM" };
+export const metadata = { title: "WhatsApp" };
 
 export default async function WhatsappPage({ searchParams }: PageProps<"/whatsapp">) {
   const ctx = await getTenantContext();
@@ -42,7 +45,7 @@ export default async function WhatsappPage({ searchParams }: PageProps<"/whatsap
   return (
     <div className="space-y-6">
       <LiveRefresh tenantId={ctx.tenantId} contactId={contact?.id ?? null} />
-      <h1 className="text-2xl font-semibold">WhatsApp</h1>
+      <PageHeader icon={MessageCircle} title="WhatsApp" subtitle="Conecte o número da empresa e converse com os contatos em tempo real." />
 
       <ConnectionPanel
         isAdmin={ctx.role === "admin"}
@@ -51,44 +54,62 @@ export default async function WhatsappPage({ searchParams }: PageProps<"/whatsap
       />
 
       <div className="grid gap-4 lg:grid-cols-3">
-        <aside className="card p-0 lg:col-span-1">
-          <h2 className="border-b border-slate-100 px-4 py-3 font-semibold">Conversas</h2>
-          <ul className="max-h-[32rem] divide-y divide-slate-100 overflow-y-auto">
-            {conversations.map((c) => (
-              <li key={c.contact_id}>
-                <Link
-                  href={`/whatsapp?contato=${c.contact_id}`}
-                  className={`block px-4 py-3 hover:bg-slate-50 ${c.contact_id === contact?.id ? "bg-sky-50" : ""}`}
-                >
-                  <div className="flex justify-between gap-2">
-                    <span className="truncate text-sm font-medium">{c.name}</span>
-                    <span className="shrink-0 text-xs text-slate-400">{dateTime(c.last_at)}</span>
-                  </div>
-                  <p className="truncate text-xs text-slate-500">
-                    {c.last_direction === "saida" ? "Você: " : ""}
-                    {c.last_body}
-                  </p>
-                </Link>
-              </li>
-            ))}
+        <aside className="card flex flex-col p-0 lg:col-span-1">
+          <h2 className="section-title border-b border-line px-5 py-4">
+            <MessageSquareText className="h-4 w-4 text-brand-300" /> Conversas
+          </h2>
+          <ul className="max-h-[34rem] flex-1 overflow-y-auto p-2">
+            {conversations.map((c) => {
+              const active = c.contact_id === contact?.id;
+              return (
+                <li key={c.contact_id}>
+                  <Link
+                    href={`/whatsapp?contato=${c.contact_id}`}
+                    className={`flex items-center gap-3 rounded-xl px-3 py-3 transition ${active ? "bg-brand-500/15 shadow-[inset_0_0_0_1px_rgb(161_0_255/0.35)]" : "hover:bg-surface-2"}`}
+                  >
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-brand-500/40 to-brand-800/60 text-xs font-semibold">
+                      {c.name.slice(0, 1).toUpperCase()}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="flex justify-between gap-2">
+                        <span className="truncate text-sm font-medium">{c.name}</span>
+                        <span className="shrink-0 text-[11px] text-subtle">{dateTime(c.last_at)}</span>
+                      </span>
+                      <span className="block truncate text-xs text-muted">
+                        {c.last_direction === "saida" ? "Você: " : ""}
+                        {c.last_body}
+                      </span>
+                    </span>
+                  </Link>
+                </li>
+              );
+            })}
             {conversations.length === 0 && (
-              <li className="px-4 py-8 text-center text-sm text-slate-500">
-                Nenhuma conversa ainda. As mensagens recebidas aparecem aqui automaticamente.
+              <li>
+                <EmptyState icon={Inbox} title="Nenhuma conversa ainda" hint="As mensagens recebidas aparecem aqui automaticamente." />
               </li>
             )}
           </ul>
         </aside>
 
-        <section className="card flex min-h-[32rem] flex-col p-0 lg:col-span-2">
+        <section className="card flex min-h-[34rem] flex-col overflow-hidden p-0 lg:col-span-2">
           {contact ? (
             <>
-              <header className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
-                <div>
-                  <Link href={`/contatos/${contact.id}`} className="font-semibold hover:underline">
-                    {contact.name}
-                  </Link>
-                  <p className="text-xs text-slate-500">{phoneFmt(contact.phone)}</p>
+              <header className="flex items-center justify-between gap-3 border-b border-line px-5 py-3.5">
+                <div className="flex items-center gap-3">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-brand-400 to-brand-700 text-sm font-semibold text-white">
+                    {contact.name.slice(0, 1).toUpperCase()}
+                  </span>
+                  <div>
+                    <Link href={`/contatos/${contact.id}`} className="font-semibold hover:text-brand-200">
+                      {contact.name}
+                    </Link>
+                    <p className="flex items-center gap-1 text-xs text-muted"><Phone className="h-3 w-3" /> {phoneFmt(contact.phone)}</p>
+                  </div>
                 </div>
+                <Link href={`/contatos/${contact.id}`} className="btn-ghost btn-sm">
+                  Ver contato <ExternalLink className="h-3.5 w-3.5" />
+                </Link>
               </header>
               <ChatThread
                 contactId={contact.id}
@@ -98,8 +119,8 @@ export default async function WhatsappPage({ searchParams }: PageProps<"/whatsap
               />
             </>
           ) : (
-            <div className="flex flex-1 items-center justify-center p-8 text-sm text-slate-500">
-              Selecione uma conversa, ou abra um contato e clique em “Conversar no WhatsApp”.
+            <div className="flex flex-1 items-center justify-center p-8">
+              <EmptyState icon={MessageCircle} title="Selecione uma conversa" hint="Ou abra um contato e clique em “Conversar no WhatsApp”." />
             </div>
           )}
         </section>

@@ -1,3 +1,4 @@
+import { History, Layers, Lock, Plus, Save, Settings, ShieldCheck, Tag, Trash2, UserPlus, UserRound, Users, X } from "lucide-react";
 import { getTenantContext } from "@/server/context";
 import { listStages } from "@/server/data/stages";
 import { listTags } from "@/server/data/tags";
@@ -5,6 +6,7 @@ import { listMembers } from "@/server/data/members";
 import { listAuditLogs } from "@/server/data/audit";
 import { ActionForm } from "@/components/action-form";
 import { TagBadge } from "@/components/tag-badge";
+import { PageHeader } from "@/components/page-header";
 import { dateTime } from "@/components/format";
 import {
   createStageAction,
@@ -18,20 +20,24 @@ import {
 } from "../actions";
 import { StageOrder } from "./stage-order";
 
-export const metadata = { title: "Configurações — CONNECTA CRM" };
+export const metadata = { title: "Configurações" };
 
 const TABLE_LABEL: Record<string, string> = {
-  contacts: "Contato",
-  pipeline_stages: "Etapa",
-  tags: "Tag",
-  contact_tags: "Tag do contato",
-  interactions: "Interação",
-  tasks: "Tarefa",
-  memberships: "Membro",
-  tenants: "Empresa",
+  contacts: "contato",
+  pipeline_stages: "etapa",
+  tags: "tag",
+  contact_tags: "tag de contato",
+  interactions: "interação",
+  tasks: "tarefa",
+  memberships: "membro",
+  tenants: "empresa",
   whatsapp_sessions: "WhatsApp",
+  whatsapp_outbox: "mensagem de WhatsApp",
 };
 const ACTION_LABEL: Record<string, string> = { INSERT: "criou", UPDATE: "alterou", DELETE: "excluiu" };
+const ACTION_COLOR: Record<string, string> = { INSERT: "bg-success", UPDATE: "bg-brand-400", DELETE: "bg-danger" };
+
+const colorInput = "h-10 w-10 shrink-0 cursor-pointer rounded-xl border border-line bg-surface-2 p-1";
 
 export default async function ConfiguracoesPage() {
   const ctx = await getTenantContext();
@@ -46,26 +52,28 @@ export default async function ConfiguracoesPage() {
 
   return (
     <div className="space-y-8">
-      <h1 className="text-2xl font-semibold">Configurações</h1>
+      <PageHeader icon={Settings} title="Configurações" subtitle={`Funil, tags, equipe e auditoria de ${ctx.tenantName}`} />
 
       <section className="card">
-        <h2 className="font-semibold">Etapas do funil</h2>
-        {!isAdmin && <p className="mt-1 text-sm text-slate-500">Somente administradores podem editar as etapas.</p>}
-        <ul className="mt-4 space-y-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="section-title"><Layers className="h-4 w-4 text-brand-300" /> Etapas do funil</h2>
+          {!isAdmin && <span className="chip"><Lock className="h-3 w-3" /> Somente administradores editam</span>}
+        </div>
+        <ul className="mt-5 space-y-2">
           {stages.map((s) => (
-            <li key={s.id} className="flex flex-wrap items-center gap-2">
-              <ActionForm action={updateStageAction} className="flex flex-1 flex-wrap items-center gap-2" submitLabel={isAdmin ? "Salvar" : undefined} submitClassName="btn-secondary">
+            <li key={s.id} className="flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface-2/40 p-2">
+              <ActionForm action={updateStageAction} className="flex flex-1 flex-wrap items-center gap-2" submitLabel={isAdmin ? "Salvar" : undefined} submitIcon={<Save className="h-3.5 w-3.5" />} submitClassName="btn-secondary btn-sm">
                 <input type="hidden" name="id" value={s.id} />
-                <input type="color" name="color" defaultValue={s.color} disabled={!isAdmin} className="h-9 w-10 rounded border border-slate-300" />
-                <input name="name" defaultValue={s.name} disabled={!isAdmin} className="input max-w-xs" />
-                <select name="kind" defaultValue={s.is_won ? "won" : s.is_lost ? "lost" : "open"} disabled={!isAdmin} className="input w-36">
+                <input type="color" name="color" defaultValue={s.color} disabled={!isAdmin} className={colorInput} aria-label="Cor da etapa" />
+                <input name="name" defaultValue={s.name} disabled={!isAdmin} className="input max-w-xs" aria-label="Nome da etapa" />
+                <select name="kind" defaultValue={s.is_won ? "won" : s.is_lost ? "lost" : "open"} disabled={!isAdmin} className="input w-40" aria-label="Tipo da etapa">
                   <option value="open">Em aberto</option>
                   <option value="won">Ganho</option>
                   <option value="lost">Perdido</option>
                 </select>
               </ActionForm>
               {isAdmin && (
-                <ActionForm action={deleteStageAction} submitLabel="Excluir" submitClassName="btn-danger">
+                <ActionForm action={deleteStageAction} submitLabel="Excluir" submitIcon={<Trash2 className="h-3.5 w-3.5" />} submitClassName="btn-danger btn-sm">
                   <input type="hidden" name="id" value={s.id} />
                 </ActionForm>
               )}
@@ -73,87 +81,104 @@ export default async function ConfiguracoesPage() {
           ))}
         </ul>
         {isAdmin && (
-          <>
-            <StageOrder stages={stages.map((s) => ({ id: s.id, name: s.name }))} />
-            <ActionForm action={createStageAction} resetOnSuccess className="mt-4 flex flex-wrap gap-2" submitLabel="Adicionar etapa">
-              <input type="color" name="color" defaultValue="#64748b" className="h-9 w-10 rounded border border-slate-300" />
-              <input name="name" required placeholder="Nova etapa" className="input max-w-xs" />
-            </ActionForm>
-          </>
+          <div className="mt-5 grid items-start gap-4 lg:grid-cols-2">
+            <StageOrder stages={stages.map((s) => ({ id: s.id, name: s.name, color: s.color }))} />
+            <div className="rounded-xl border border-dashed border-line p-4">
+              <p className="text-sm font-medium">Adicionar etapa</p>
+              <ActionForm action={createStageAction} resetOnSuccess className="mt-3 flex flex-wrap items-center gap-2" submitLabel="Adicionar" submitIcon={<Plus className="h-4 w-4" />}>
+                <input type="color" name="color" defaultValue="#a100ff" className={colorInput} aria-label="Cor" />
+                <input name="name" required placeholder="Ex.: Negociação" className="input max-w-xs flex-1" />
+              </ActionForm>
+            </div>
+          </div>
         )}
       </section>
 
       <section className="card">
-        <h2 className="font-semibold">Tags</h2>
+        <h2 className="section-title"><Tag className="h-4 w-4 text-brand-300" /> Tags</h2>
         <ul className="mt-4 flex flex-wrap gap-2">
           {tags.map((t) => (
-            <li key={t.id} className="flex items-center gap-1">
+            <li key={t.id} className="flex items-center gap-0.5">
               <TagBadge {...t} />
               <form action={deleteTagAction}>
                 <input type="hidden" name="id" value={t.id} />
-                <button className="text-xs text-slate-400 hover:text-red-600" title="Excluir">✕</button>
+                <button className="icon-btn h-6 w-6 hover:text-danger" title="Excluir tag" aria-label={`Excluir tag ${t.name}`}><X className="h-3 w-3" /></button>
               </form>
             </li>
           ))}
-          {tags.length === 0 && <li className="text-sm text-slate-500">Nenhuma tag.</li>}
+          {tags.length === 0 && <li className="text-sm text-subtle">Nenhuma tag criada.</li>}
         </ul>
-        <ActionForm action={createTagAction} resetOnSuccess className="mt-4 flex flex-wrap gap-2" submitLabel="Criar tag">
-          <input type="color" name="color" defaultValue="#0ea5e9" className="h-9 w-10 rounded border border-slate-300" />
+        <ActionForm action={createTagAction} resetOnSuccess className="mt-4 flex flex-wrap items-center gap-2" submitLabel="Criar tag" submitIcon={<Plus className="h-4 w-4" />}>
+          <input type="color" name="color" defaultValue="#a100ff" className={colorInput} aria-label="Cor da tag" />
           <input name="name" required placeholder="Nome da tag" className="input max-w-xs" />
         </ActionForm>
       </section>
 
       <section className="card">
-        <h2 className="font-semibold">Usuários</h2>
-        <ul className="mt-4 divide-y divide-slate-100">
+        <h2 className="section-title"><Users className="h-4 w-4 text-brand-300" /> Equipe</h2>
+        <ul className="mt-4 divide-y divide-line">
           {members.map((m) => (
-            <li key={m.id} className="flex flex-wrap items-center gap-3 py-2 text-sm">
-              <span className="flex-1 font-medium">{m.display_name ?? "Usuário"}{m.user_id === ctx.userId && " (você)"}</span>
-              {isAdmin ? (
+            <li key={m.id} className="flex flex-wrap items-center gap-3 py-3 text-sm">
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-brand-500/50 to-brand-800/70 text-xs font-semibold">
+                {(m.display_name ?? "U").slice(0, 1).toUpperCase()}
+              </span>
+              <span className="flex-1">
+                <span className="block font-medium">{m.display_name ?? "Usuário"}{m.user_id === ctx.userId && <span className="text-muted"> (você)</span>}</span>
+                <span className="flex items-center gap-1 text-xs text-muted">
+                  {m.role === "admin" ? <ShieldCheck className="h-3 w-3 text-brand-300" /> : <UserRound className="h-3 w-3" />}
+                  {m.role === "admin" ? "Administrador" : "Atendente"}
+                </span>
+              </span>
+              {isAdmin && (
                 <>
-                  <ActionForm action={updateMemberRoleAction} className="flex items-center gap-2" submitLabel="Alterar" submitClassName="btn-secondary py-1 text-xs">
+                  <ActionForm action={updateMemberRoleAction} className="flex items-center gap-2" submitLabel="Alterar" submitClassName="btn-secondary btn-sm">
                     <input type="hidden" name="id" value={m.id} />
-                    <select name="role" defaultValue={m.role} className="input w-36 py-1">
+                    <select name="role" defaultValue={m.role} className="input w-40 py-1.5" aria-label="Papel">
                       <option value="admin">Administrador</option>
                       <option value="atendente">Atendente</option>
                     </select>
                   </ActionForm>
                   {m.user_id !== ctx.userId && (
-                    <ActionForm action={removeMemberAction} submitLabel="Remover" submitClassName="btn-danger py-1 text-xs">
+                    <ActionForm action={removeMemberAction} submitLabel="Remover" submitIcon={<Trash2 className="h-3.5 w-3.5" />} submitClassName="btn-danger btn-sm">
                       <input type="hidden" name="id" value={m.id} />
                     </ActionForm>
                   )}
                 </>
-              ) : (
-                <span className="text-slate-500">{m.role === "admin" ? "Administrador" : "Atendente"}</span>
               )}
             </li>
           ))}
         </ul>
         {isAdmin && (
-          <ActionForm action={inviteMemberAction} resetOnSuccess className="mt-4 grid gap-2 md:grid-cols-5" submitLabel="Criar usuário">
-            <input name="display_name" required placeholder="Nome" className="input" />
-            <input name="email" type="email" required placeholder="E-mail" className="input" />
-            <input name="password" type="password" required minLength={10} placeholder="Senha inicial (10+)" className="input" />
-            <select name="role" defaultValue="atendente" className="input">
-              <option value="atendente">Atendente</option>
-              <option value="admin">Administrador</option>
-            </select>
-          </ActionForm>
+          <div className="mt-4 rounded-xl border border-dashed border-line p-4">
+            <p className="flex items-center gap-2 text-sm font-medium"><UserPlus className="h-4 w-4 text-brand-300" /> Adicionar pessoa</p>
+            <ActionForm action={inviteMemberAction} resetOnSuccess className="mt-3 grid gap-2 md:grid-cols-5" submitLabel="Criar usuário" submitIcon={<UserPlus className="h-4 w-4" />}>
+              <input name="display_name" required placeholder="Nome" className="input" aria-label="Nome" />
+              <input name="email" type="email" required placeholder="E-mail" className="input" aria-label="E-mail" />
+              <input name="password" type="password" required minLength={10} placeholder="Senha inicial (10+)" className="input" aria-label="Senha inicial" />
+              <select name="role" defaultValue="atendente" className="input" aria-label="Papel">
+                <option value="atendente">Atendente</option>
+                <option value="admin">Administrador</option>
+              </select>
+            </ActionForm>
+          </div>
         )}
       </section>
 
       {isAdmin && (
         <section className="card">
-          <h2 className="font-semibold">Auditoria (últimas 50 alterações)</h2>
-          <ul className="mt-4 divide-y divide-slate-100 text-sm">
+          <h2 className="section-title"><History className="h-4 w-4 text-brand-300" /> Auditoria <span className="text-xs font-normal text-subtle">últimas 50 alterações</span></h2>
+          <ul className="mt-4 space-y-1 text-sm">
             {logs.map((l) => (
-              <li key={l.id} className="py-2">
-                <span className="text-slate-400">{dateTime(l.created_at)}</span>{" · "}
-                <span className="font-medium">{l.user_id ? memberName.get(l.user_id) ?? "Usuário removido" : "Sistema"}</span>{" "}
-                {ACTION_LABEL[l.action] ?? l.action} {TABLE_LABEL[l.table_name] ?? l.table_name}
+              <li key={l.id} className="flex items-center gap-3 rounded-lg px-2 py-1.5 hover:bg-surface-2/50">
+                <span className={`h-2 w-2 shrink-0 rounded-full ${ACTION_COLOR[l.action] ?? "bg-subtle"}`} aria-hidden />
+                <span className="w-32 shrink-0 text-xs text-subtle">{dateTime(l.created_at)}</span>
+                <span className="min-w-0 truncate">
+                  <span className="font-medium">{l.user_id ? memberName.get(l.user_id) ?? "Usuário removido" : "Sistema"}</span>{" "}
+                  <span className="text-muted">{ACTION_LABEL[l.action] ?? l.action} {TABLE_LABEL[l.table_name] ?? l.table_name}</span>
+                </span>
               </li>
             ))}
+            {logs.length === 0 && <li className="text-subtle">Sem registros.</li>}
           </ul>
         </section>
       )}
