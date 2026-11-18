@@ -120,9 +120,13 @@ describe("fila de envio (outbox)", () => {
     expect(n[0].n).toBe(1);
   });
 
-  it("A não altera status nem apaga mensagens da fila (worker é quem atualiza)", async () => {
+  it("A não altera status nem apaga mensagens não agendadas da fila (worker é quem atualiza)", async () => {
     await expectDbError(as({ userId: A.adminId }, (q) => q("update public.whatsapp_outbox set status = 'enviado'")));
-    await expectDbError(as({ userId: A.adminId }, (q) => q("delete from public.whatsapp_outbox")));
+    const before = await raw<{ n: number }>("select count(*)::int as n from public.whatsapp_outbox");
+    const del = await as({ userId: A.adminId }, (q) => q("delete from public.whatsapp_outbox"));
+    expect(del.rowCount).toBe(0);
+    const after = await raw<{ n: number }>("select count(*)::int as n from public.whatsapp_outbox");
+    expect(after[0].n).toBe(before[0].n);
   });
 
   it("A enfileira para o próprio contato e a linha fica no tenant A", async () => {
