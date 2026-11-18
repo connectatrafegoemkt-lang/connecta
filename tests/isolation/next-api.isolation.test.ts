@@ -32,6 +32,7 @@ interface T {
   stageId: string;
   taskId: string;
   interactionId: string;
+  departmentId: string;
 }
 
 let admin: SupabaseClient;
@@ -90,6 +91,9 @@ async function setup(label: string): Promise<T> {
     body: JSON.stringify({ contact_id: t.contactId, type: "nota", body: `segredo ${label}` }),
   });
   t.interactionId = inter.body.id as string;
+  const dept = await api(t, "/api/departments", { method: "POST", body: JSON.stringify({ name: `Setor ${label}` }) });
+  expect(dept.status).toBe(201);
+  t.departmentId = dept.body.id as string;
   return t;
 }
 
@@ -230,7 +234,57 @@ describe.skipIf(!enabled)("isolamento via API do app (Next.js)", () => {
     expect(audit.status).toBe(200);
     const bMembers = await admin.from("memberships").select("id").eq("tenant_id", B.tenantId);
     const bMemberId = bMembers.data![0].id;
-    expect((await api(A, `/api/members/${bMemberId}`, { method: "PATCH", body: JSON.stringify({ role: "atendente" }) })).status).toBe(404);
+    expect((await api(A, `/api/members/${bMemberId}`, { method: "PATCH", body: JSON.stringify({ profile: "atendente" }) })).status).toBe(404);
     expect((await api(A, `/api/members/${bMemberId}`, { method: "DELETE" })).status).toBe(404);
+  });
+
+  it("setores: A não vê, não altera, não exclui e não usa setores de B", async () => {
+    const list = await api(A, "/api/departments");
+    expect((list.body as unknown as { id: string }[]).map((d) => d.id)).toEqual([A.departmentId]);
+    expect((await api(A, `/api/departments/${B.departmentId}`, { method: "PATCH", body: JSON.stringify({ name: "x" }) })).status).toBe(404);
+    expect((await api(A, `/api/departments/${B.departmentId}`, { method: "DELETE" })).status).toBe(404);
+    // Ligar contato de A a setor de B falha (FK composta por tenant)
+    const r = await api(A, `/api/contacts/${A.contactId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ department_id: B.departmentId }),
+    });
+    expect(r.status).toBeGreaterThanOrEqual(400);
+    // Criar usuário em A com setor de B é recusado (e nenhum login fica criado)
+    const email = `next-x-${run}@teste.connecta.local`;
+    const inv = await api(A, "/api/members", {
+      method: "POST",
+      body: JSON.stringify({ email, password: `Senha-${randomUUID()}`, display_name: "X", profile: "atendente", department_ids: [B.departmentId] }),
+    });
+    expect(inv.status).toBe(400);
+    const { data } = await admin.auth.admin.listUsers({ perPage: 1000 });
+    expect(data.users.some((u) => u.email === email)).toBe(false);
+    const bDept = await admin.from("departments").select("name").eq("id", B.departmentId).single();
+    expect(bDept.data!.name).toBe("Setor b");
+  });
+
+  it("perfis: usuário criado por A como atendente recebe as permissões do perfil e fica em A", async () => {
+    const email = `next-at-${run}@teste.connecta.local`;
+    const password = `Senha-${randomUUID()}`;
+    const inv = await api(A, "/api/members", {
+      method: "POST",
+      body: JSON.stringify({ email, password, display_name: "Atendente A", profile: "atendente", department_ids: [A.departmentId] }),
+    });
+    expect(inv.status).toBe(201);
+    users.push(inv.body.user_id as string);
+    const c = createClient(URL!, ANON!, opts);
+    const { data: s } = await c.auth.signInWithPassword({ email, password });
+    const at = { ...A, token: s.session!.access_token };
+    const me = await api(at, "/api/me");
+    expect(me.body.tenant_id).toBe(A.tenantId);
+    expect(me.body.profile).toBe("atendente");
+    expect(me.body.department_ids).toEqual([A.departmentId]);
+    expect(me.body.permissions).not.toContain("equipe.gerenciar");
+    // Atendente não gerencia equipe nem setores
+    expect((await api(at, "/api/departments", { method: "POST", body: JSON.stringify({ name: "hack" }) })).status).toBe(403);
+    expect((await api(at, "/api/members", { method: "POST", body: JSON.stringify({ email: `z-${run}@teste.connecta.local`, password: `Senha-${randomUUID()}`, display_name: "Z", profile: "admin" }) })).status).toBe(403);
+    // Contato sem setor (criado pelo admin) é visível; criar contato vai para o setor dele
+    const created = await api(at, "/api/contacts", { method: "POST", body: JSON.stringify({ name: "Lead do setor" }) });
+    expect(created.status).toBe(201);
+    expect(created.body.department_id).toBe(A.departmentId);
   });
 });

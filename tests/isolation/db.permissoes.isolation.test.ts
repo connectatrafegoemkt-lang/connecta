@@ -12,6 +12,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { randomUUID } from "node:crypto";
 import { as, createTenantFixture, expectDbError, pool, raw, type TenantFixture } from "./db-helpers";
+import { PERMISSION_KEYS, PROFILE_PERMISSIONS } from "../../src/shared/permissions";
 
 let A: TenantFixture;
 let B: TenantFixture;
@@ -233,5 +234,16 @@ describe("gestão da equipe sem escalada de privilégio", () => {
       expect((await q("update public.memberships set display_name = 'HACK' where tenant_id = $1", [B.tenantId])).rowCount).toBe(0);
       expect((await q("delete from public.departments where tenant_id = $1", [B.tenantId])).rowCount).toBe(0);
     });
+  });
+});
+
+describe("catálogo do app = catálogo do banco", () => {
+  it("permissões e perfis padrão de src/shared/permissions.ts batem com o banco", async () => {
+    const [cat] = await raw<{ c: string[] }>("select app.permission_catalog() as c");
+    expect([...cat.c].sort()).toEqual([...PERMISSION_KEYS].sort());
+    for (const [profile, perms] of Object.entries(PROFILE_PERMISSIONS)) {
+      const [r] = await raw<{ p: string[] }>("select app.profile_permissions($1) as p", [profile]);
+      expect([...r.p].sort(), profile).toEqual([...perms].sort());
+    }
   });
 });
