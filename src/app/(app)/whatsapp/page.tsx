@@ -1,5 +1,6 @@
+import { redirect } from "next/navigation";
 import Link from "next/link";
-import { getTenantContext } from "@/server/context";
+import { can, getTenantContext } from "@/server/context";
 import { getContact } from "@/server/data/contacts";
 import {
   getWhatsappQr,
@@ -28,6 +29,7 @@ export const metadata = { title: "WhatsApp" };
 
 export default async function WhatsappPage({ searchParams }: PageProps<"/whatsapp">) {
   const ctx = await getTenantContext();
+  if (!can(ctx, "whatsapp.ver")) redirect("/dashboard");
   const sp = await searchParams;
   const selected = idSchema.safeParse(sp.contato).success ? (sp.contato as string) : null;
   const tagFilter = idSchema.safeParse(sp.etiqueta).success ? (sp.etiqueta as string) : undefined;
@@ -71,7 +73,7 @@ export default async function WhatsappPage({ searchParams }: PageProps<"/whatsap
       <PageHeader icon={MessageCircle} title="WhatsApp" subtitle="Conecte o número da empresa e converse com os contatos em tempo real." />
 
       <ConnectionPanel
-        isAdmin={ctx.role === "admin"}
+        isAdmin={can(ctx, "whatsapp.conectar")}
         tenantId={ctx.tenantId}
         initial={{ status: session.status, phone: session.phone, last_error: session.last_error, qr }}
       />
@@ -159,6 +161,7 @@ export default async function WhatsappPage({ searchParams }: PageProps<"/whatsap
               <ChatThread
                 contactId={contact.id}
                 canSend={!!contact.phone}
+                canWrite={can(ctx, "whatsapp.enviar")}
                 connected={session.status === "conectado"}
                 quickReplies={quickReplies}
                 messages={thread}

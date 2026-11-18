@@ -20,7 +20,9 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react";
-import { getTenantContext } from "@/server/context";
+import { redirect } from "next/navigation";
+import { can, getTenantContext } from "@/server/context";
+import { listDepartments } from "@/server/data/departments";
 import { HttpError } from "@/server/errors";
 import { getContact } from "@/server/data/contacts";
 import { listInteractions } from "@/server/data/interactions";
@@ -52,6 +54,10 @@ const TYPE_ICON: Record<string, LucideIcon> = {
 export default async function ContatoPage({ params }: PageProps<"/contatos/[id]">) {
   const { id } = await params;
   const ctx = await getTenantContext();
+  if (!can(ctx, "contatos.ver")) redirect(`/whatsapp?contato=${encodeURIComponent(id)}`);
+  const canEdit = can(ctx, "contatos.editar");
+  const canTasks = can(ctx, "tarefas.editar");
+  const allSectors = can(ctx, "setores.todos");
   let contact;
   try {
     contact = await getContact(ctx, id);
@@ -59,13 +65,15 @@ export default async function ContatoPage({ params }: PageProps<"/contatos/[id]"
     if (e instanceof HttpError && (e.status === 404 || e.status === 400)) notFound();
     throw e;
   }
-  const [interactions, tasks, stages, tags, members] = await Promise.all([
+  const [interactions, tasks, stages, tags, members, departments] = await Promise.all([
     listInteractions(ctx, id),
     listTasks(ctx, { contact_id: id }),
     listStages(ctx),
     listTags(ctx),
     listMembers(ctx),
+    listDepartments(ctx),
   ]);
+  const myDepartments = allSectors ? departments : departments.filter((d) => ctx.departmentIds.includes(d.id) || d.id === contact.department_id);
   const tagSet = new Set(contact.tags?.map((t) => t.id));
   const memberName = new Map(members.map((m) => [m.user_id, m.display_name ?? "Usuário"]));
   const stage = stages.find((s) => s.id === contact.stage_id);
@@ -107,7 +115,8 @@ export default async function ContatoPage({ params }: PageProps<"/contatos/[id]"
       <div className="grid gap-6 lg:grid-cols-3">
         <section className="card h-fit lg:col-span-1">
           <h2 className="section-title">Dados do contato</h2>
-          <ActionForm action={updateContactAction} className="mt-4 space-y-3" submitLabel="Salvar alterações" submitIcon={<Save className="h-4 w-4" />} submitClassName="btn-primary w-full">
+          <ActionForm action={updateContactAction} className="mt-4 space-y-3" submitLabel={canEdit ? "Salvar alterações" : undefined} submitIcon={<Save className="h-4 w-4" />} submitClassName="btn-primary w-full">
+            <fieldset disabled={!canEdit} className="space-y-3">
             <input type="hidden" name="id" value={contact.id} />
             <input type="hidden" name="tags_present" value="1" />
             <label className="block"><span className="label">Nome</span><input name="name" defaultValue={contact.name} required className="input" /></label>
@@ -127,6 +136,14 @@ export default async function ContatoPage({ params }: PageProps<"/contatos/[id]"
                 </select>
               </label>
             </div>
+            {departments.length > 0 && (
+              <label className="block"><span className="label">Setor</span>
+                <select name="department_id" defaultValue={contact.department_id ?? ""} className="input">
+                  {(allSectors || !contact.department_id) && <option value="">Sem setor</option>}
+                  {myDepartments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+                </select>
+              </label>
+            )}
             <fieldset>
               <legend className="label">Tags</legend>
               <div className="flex flex-wrap gap-2">
@@ -146,14 +163,18 @@ export default async function ContatoPage({ params }: PageProps<"/contatos/[id]"
               </div>
             </fieldset>
             <label className="block"><span className="label">Observações</span><textarea name="notes" defaultValue={contact.notes ?? ""} rows={3} className="input" /></label>
+            </fieldset>
           </ActionForm>
-          <form action={deleteContactAction} className="mt-4 border-t border-line pt-4">
-            <input type="hidden" name="id" value={contact.id} />
-            <button className="btn-danger w-full"><Trash2 className="h-4 w-4" /> Excluir contato</button>
-          </form>
+          {can(ctx, "contatos.excluir") && (
+            <form action={deleteContactAction} className="mt-4 border-t border-line pt-4">
+              <input type="hidden" name="id" value={contact.id} />
+              <button className="btn-danger w-full"><Trash2 className="h-4 w-4" /> Excluir contato</button>
+            </form>
+          )}
         </section>
 
         <section className="space-y-6 lg:col-span-2">
+          {canEdit && (
           <div className="card">
             <h2 className="section-title"><Plus className="h-4 w-4 text-accent" /> Registrar interação</h2>
             <ActionForm action={createInteractionAction} resetOnSuccess className="mt-4 grid gap-3 md:grid-cols-3" submitLabel="Registrar" submitClassName="btn-primary md:col-start-3">
@@ -177,6 +198,7 @@ export default async function ContatoPage({ params }: PageProps<"/contatos/[id]"
               <textarea name="body" required rows={2} placeholder="O que aconteceu?" className="input md:col-span-3" />
             </ActionForm>
           </div>
+          )}
 
           <div className="card">
             <h2 className="section-title"><History className="h-4 w-4 text-accent" /> Histórico</h2>
@@ -201,7 +223,7 @@ export default async function ContatoPage({ params }: PageProps<"/contatos/[id]"
                         </p>
                         <p className="mt-1 whitespace-pre-wrap break-words text-sm text-fg">{i.body}</p>
                       </div>
-                      {i.type !== "whatsapp" && (
+                      {i.type !== "whatsapp" && canEdit && (
                         <form action={deleteInteractionAction} className="absolute right-2 top-2">
                           <input type="hidden" name="id" value={i.id} />
                           <input type="hidden" name="contact_id" value={contact.id} />
@@ -225,23 +247,23 @@ export default async function ContatoPage({ params }: PageProps<"/contatos/[id]"
                       {t.title}
                       <span className="ml-2 inline-flex items-center gap-1 text-xs text-subtle"><CalendarClock className="h-3 w-3" />{dateTime(t.due_at)}</span>
                     </span>
-                    <form action={setTaskStatusAction}>
+                    {canTasks && <form action={setTaskStatusAction}>
                       <input type="hidden" name="id" value={t.id} />
                       <input type="hidden" name="status" value={t.status === "concluida" ? "pendente" : "concluida"} />
                       <button className="btn-secondary btn-sm">
                         {t.status === "concluida" ? <><RotateCcw className="h-3.5 w-3.5" /> Reabrir</> : <><Check className="h-3.5 w-3.5" /> Concluir</>}
                       </button>
-                    </form>
+                    </form>}
                   </li>
                 ))}
               </ul>
             )}
-            <ActionForm action={createTaskAction} resetOnSuccess className="mt-4 grid gap-2 md:grid-cols-4" submitLabel="Adicionar tarefa" submitIcon={<Plus className="h-4 w-4" />} submitClassName="btn-secondary md:col-start-4">
+            {canTasks && <ActionForm action={createTaskAction} resetOnSuccess className="mt-4 grid gap-2 md:grid-cols-4" submitLabel="Adicionar tarefa" submitIcon={<Plus className="h-4 w-4" />} submitClassName="btn-secondary md:col-start-4">
               <input type="hidden" name="contact_id" value={contact.id} />
               <input name="title" required placeholder="Nova tarefa" className="input md:col-span-2" />
               <input type="datetime-local" name="due_at" className="input" title="Prazo" aria-label="Prazo" />
               <input type="datetime-local" name="remind_at" className="input" title="Lembrete" aria-label="Lembrete" />
-            </ActionForm>
+            </ActionForm>}
           </div>
         </section>
       </div>

@@ -18,6 +18,7 @@ function StatusIcon({ status }: { status: string | null }) {
 export function ChatThread({
   contactId,
   canSend,
+  canWrite = true,
   messages,
   pending,
   suggestion = null,
@@ -26,6 +27,8 @@ export function ChatThread({
 }: {
   contactId: string;
   canSend: boolean;
+  /** Permissão "Enviar mensagens no WhatsApp". */
+  canWrite?: boolean;
   messages: {
     id: string;
     direction: string;
@@ -133,7 +136,7 @@ export function ChatThread({
         <div ref={end} />
       </div>
       <div className="border-t border-line bg-surface p-3">
-        {showSuggestion && canSend && (
+        {showSuggestion && canSend && canWrite && (
           <div className="mb-3 rounded-xl border border-brand-500/40 bg-accent-soft p-3">
             <p className="flex items-center gap-1.5 text-xs font-semibold text-accent-strong">
               <Sparkles className="h-3.5 w-3.5" /> Sugestão da IA
@@ -149,7 +152,9 @@ export function ChatThread({
             </div>
           </div>
         )}
-        {canSend ? (
+        {!canWrite ? (
+          <p className="text-sm text-muted">Você pode ver esta conversa, mas não tem permissão para enviar mensagens.</p>
+        ) : canSend ? (
           <Composer contactId={contactId} quickReplies={quickReplies} connected={connected} inputRef={inputRef} prefill={prefill} />
         ) : (
           <p className="text-sm text-muted">Cadastre o telefone do contato para enviar mensagens.</p>

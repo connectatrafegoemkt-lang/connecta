@@ -24,7 +24,7 @@ interface Stage {
   is_lost?: boolean;
 }
 
-export function KanbanBoard({ stages, contacts }: { stages: Stage[]; contacts: Card[] }) {
+export function KanbanBoard({ stages, contacts, readOnly = false }: { stages: Stage[]; contacts: Card[]; readOnly?: boolean }) {
   const [, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [dragging, setDragging] = useState<string | null>(null);
@@ -91,7 +91,7 @@ export function KanbanBoard({ stages, contacts }: { stages: Stage[]; contacts: C
                 {column.map((c, idx) => (
                   <li
                     key={c.id}
-                    draggable
+                    draggable={!readOnly}
                     onDragStart={() => setDragging(c.id)}
                     onDragEnd={() => setDragging(null)}
                     onDrop={(e) => {

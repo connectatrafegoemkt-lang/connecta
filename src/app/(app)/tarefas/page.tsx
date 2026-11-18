@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { AlarmClock, Ban, CalendarClock, Check, CircleCheck, ListTodo, Plus, Trash2, UserRound } from "lucide-react";
-import { getTenantContext } from "@/server/context";
+import { can, getTenantContext } from "@/server/context";
 import { listTasks } from "@/server/data/tasks";
 import { listMembers } from "@/server/data/members";
 import { ActionForm } from "@/components/action-form";
@@ -23,11 +23,13 @@ export default async function TarefasPage({ searchParams }: PageProps<"/tarefas"
   const status = FILTERS.find(([k]) => k === sp.status)?.[0] ?? "pendente";
   const [tasks, members] = await Promise.all([listTasks(ctx, { status }), listMembers(ctx)]);
   const memberName = new Map(members.map((m) => [m.user_id, m.display_name ?? "Usuário"]));
+  const canTasks = can(ctx, "tarefas.editar");
 
   return (
     <div className="space-y-6">
       <PageHeader icon={ListTodo} title="Tarefas e lembretes" subtitle="Organize o follow-up da equipe e não perca nenhum retorno." />
 
+      {canTasks && (
       <div className="card">
         <h2 className="section-title"><Plus className="h-4 w-4 text-accent" /> Nova tarefa</h2>
         <ActionForm action={createTaskAction} resetOnSuccess className="mt-4 grid gap-3 md:grid-cols-6" submitLabel="Criar tarefa" submitIcon={<Plus className="h-4 w-4" />} submitClassName="btn-primary self-end md:col-start-6">
@@ -42,6 +44,7 @@ export default async function TarefasPage({ searchParams }: PageProps<"/tarefas"
           <label className="md:col-span-5"><span className="label">Descrição</span><textarea name="description" rows={1} className="input" /></label>
         </ActionForm>
       </div>
+      )}
 
       <nav className="inline-flex rounded-xl border border-line bg-surface p-1">
         {FILTERS.map(([k, label, Icon]) => (
@@ -59,6 +62,7 @@ export default async function TarefasPage({ searchParams }: PageProps<"/tarefas"
         {tasks.length === 0 ? (
           <EmptyState icon={CircleCheck} title="Nada por aqui" hint={status === "pendente" ? "Todas as tarefas em dia." : undefined} />
         ) : (
+          <fieldset disabled={!canTasks} className="contents">
           <ul className="divide-y divide-line">
             {tasks.map((t) => {
               const done = t.status === "concluida";
@@ -103,6 +107,7 @@ export default async function TarefasPage({ searchParams }: PageProps<"/tarefas"
               );
             })}
           </ul>
+          </fieldset>
         )}
       </div>
     </div>
