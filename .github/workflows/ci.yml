@@ -99,3 +99,24 @@ jobs:
       - name: Log do Next.js (em caso de falha)
         if: failure()
         run: tail -100 /tmp/next.log || true
+
+  docker:
+    name: Build das imagens Docker (app e worker)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build do app
+        run: docker build --build-arg NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321 --build-arg NEXT_PUBLIC_SUPABASE_ANON_KEY=ci -t crm-app .
+      - name: Build do worker
+        run: docker build -f worker/Dockerfile -t crm-worker .
+      - name: App sobe e responde
+        run: |
+          docker run -d --name app -p 3000:3000 -e NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321 -e NEXT_PUBLIC_SUPABASE_ANON_KEY=ci crm-app
+          for i in $(seq 1 30); do curl -sf -o /dev/null http://127.0.0.1:3000/login && break; sleep 1; done
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/login)" = "200"
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/api/me)" = "401"
+      - name: Worker inicia sem erro de módulo
+        run: |
+          docker run -d --name worker -e SUPABASE_URL=http://127.0.0.1:1 -e SUPABASE_SERVICE_ROLE_KEY=x -e WHATSAPP_CREDENTIALS_KEY=$(openssl rand -base64 32) crm-worker
+          sleep 15; docker logs worker 2>&1 | tail -20
+          docker logs worker 2>&1 | grep -q "worker do WhatsApp iniciado"
