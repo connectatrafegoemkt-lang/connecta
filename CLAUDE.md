@@ -38,6 +38,11 @@ Realtime), Tailwind CSS.
    No worker, todo acesso passa por `WorkerTenantRepo` (preso a um tenant).
    `whatsapp_auth_keys` guarda credenciais cifradas (AES-256-GCM, chave por
    tenant via HKDF + AAD) e não tem policy para usuários.
+   Exceção única: o **Painel da CONNECTA** (`src/app/plataforma`,
+   `src/server/platform.ts`, `src/server/admin/platform-admin.ts`) vê
+   METADADOS de todos os clientes via `public.platform_tenants_overview()`
+   (SECURITY DEFINER, exige `public.is_platform_admin()`, lista em
+   `app.platform_admins`). Nunca expor contatos/conversas/dados de negócio ali.
 6. Storage: bucket privado `tenant-files`, caminho `<tenant_id>/...`, policies
    comparando o primeiro segmento do caminho com o tenant do usuário.
 7. Perfis por tenant (`memberships.profile`: admin, gerente, atendente,
