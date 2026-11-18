@@ -19,6 +19,7 @@ import {
   taskCreateSchema,
   taskUpdateSchema,
   whatsappSendSchema,
+  quickReplySchema,
 } from "@/server/validation";
 import { createContact, deleteContact, moveContact, updateContact } from "@/server/data/contacts";
 import { createInteraction, deleteInteraction } from "@/server/data/interactions";
@@ -27,6 +28,7 @@ import { createStage, deleteStage, reorderStages, updateStage } from "@/server/d
 import { createTag, deleteTag } from "@/server/data/tags";
 import { inviteMember, removeMember, updateMember } from "@/server/data/members";
 import { queueWhatsappMessage, requestWhatsapp } from "@/server/data/whatsapp";
+import { cancelScheduled, createQuickReply, deleteQuickReply, queueTextMessage } from "@/server/data/whatsapp-media";
 import { saveAiSettings, setContactAi, setSuggestionStatus, testAiReply } from "@/server/data/ai";
 
 /*
@@ -276,8 +278,11 @@ export async function whatsappSendAction(_: ActionState, fd: FormData): Promise<
   try {
     const ctx = await getTenantContext();
     const { contact_id, body } = parseOrThrow(whatsappSendSchema, pick(fd, ["contact_id", "body"]));
-    await queueWhatsappMessage(ctx, contact_id, body);
-    return { ok: true };
+    const scheduled = localToIso(fd.get("scheduled_at"));
+    if (scheduled) await queueTextMessage(ctx, contact_id, body, scheduled);
+    else await queueWhatsappMessage(ctx, contact_id, body);
+    revalidatePath("/whatsapp");
+    return { ok: true, message: scheduled ? "Mensagem agendada." : null };
   } catch (e) {
     return toActionError(e);
   }
@@ -322,6 +327,45 @@ export async function setContactAiAction(contactId: string, active: boolean): Pr
 export async function setSuggestionStatusAction(id: string, status: "usada" | "descartada"): Promise<ActionState> {
   try {
     await setSuggestionStatus(await getTenantContext(), parseOrThrow(idSchema, id), status === "usada" ? "usada" : "descartada");
+    return { ok: true };
+  } catch (e) {
+    return toActionError(e);
+  }
+}
+
+// ------------------------------------------- WhatsApp: agendamentos, rápidas, etiquetas
+export async function cancelScheduledAction(id: string): Promise<ActionState> {
+  try {
+    await cancelScheduled(await getTenantContext(), parseOrThrow(idSchema, id));
+    revalidatePath("/whatsapp");
+    return { ok: true };
+  } catch (e) {
+    return toActionError(e);
+  }
+}
+
+export async function createQuickReplyAction(_: ActionState, fd: FormData): Promise<ActionState> {
+  try {
+    await createQuickReply(await getTenantContext(), parseOrThrow(quickReplySchema, pick(fd, ["shortcut", "title", "body"])));
+    revalidatePath("/configuracoes");
+    revalidatePath("/whatsapp");
+    return { ok: true, message: "Mensagem rápida criada." };
+  } catch (e) {
+    return toActionError(e);
+  }
+}
+
+export async function deleteQuickReplyAction(fd: FormData) {
+  await deleteQuickReply(await getTenantContext(), parseOrThrow(idSchema, fd.get("id")));
+  revalidatePath("/configuracoes");
+}
+
+export async function setContactTagsAction(contactId: string, tagIds: string[]): Promise<ActionState> {
+  try {
+    const ctx = await getTenantContext();
+    const input = parseOrThrow(contactUpdateSchema, { tag_ids: Array.isArray(tagIds) ? tagIds : [] });
+    await updateContact(ctx, parseOrThrow(idSchema, contactId), input);
+    revalidatePath("/whatsapp");
     return { ok: true };
   } catch (e) {
     return toActionError(e);
