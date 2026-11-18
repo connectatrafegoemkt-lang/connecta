@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Filter, Plus, Search, UserPlus, Users } from "lucide-react";
 import { getTenantContext } from "@/server/context";
 import { listContacts } from "@/server/data/contacts";
 import { listStages } from "@/server/data/stages";
@@ -6,110 +7,132 @@ import { listTags } from "@/server/data/tags";
 import { contactListQuerySchema } from "@/server/validation";
 import { ActionForm } from "@/components/action-form";
 import { TagBadge } from "@/components/tag-badge";
+import { PageHeader } from "@/components/page-header";
+import { EmptyState } from "@/components/empty-state";
 import { brl, dateTime, phoneFmt } from "@/components/format";
 import { createContactAction } from "../actions";
 
-export const metadata = { title: "Contatos — CONNECTA CRM" };
+export const metadata = { title: "Contatos" };
+
+function initials(name: string) {
+  return name.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]!.toUpperCase()).join("");
+}
 
 export default async function ContatosPage({ searchParams }: PageProps<"/contatos">) {
   const ctx = await getTenantContext();
   const sp = await searchParams;
-  const parsed = contactListQuerySchema.safeParse({
-    q: typeof sp.q === "string" && sp.q ? sp.q : undefined,
-    stage_id: typeof sp.etapa === "string" && sp.etapa ? sp.etapa : undefined,
-    tag_id: typeof sp.tag === "string" && sp.tag ? sp.tag : undefined,
-  });
+  const str = (v: unknown) => (typeof v === "string" && v ? v : undefined);
+  const parsed = contactListQuerySchema.safeParse({ q: str(sp.q), stage_id: str(sp.etapa), tag_id: str(sp.tag) });
   const filters = parsed.success ? parsed.data : { limit: 50, offset: 0 };
-  const [{ items, total }, stages, tags] = await Promise.all([
-    listContacts(ctx, filters),
-    listStages(ctx),
-    listTags(ctx),
-  ]);
-  const stageName = new Map(stages.map((s) => [s.id, s]));
+  const [{ items, total }, stages, tags] = await Promise.all([listContacts(ctx, filters), listStages(ctx), listTags(ctx)]);
+  const stageById = new Map(stages.map((s) => [s.id, s]));
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold">Contatos <span className="text-base font-normal text-slate-400">({total})</span></h1>
-      </div>
+      <PageHeader icon={Users} title="Contatos" subtitle={`${total} contato${total === 1 ? "" : "s"} na sua base`} />
 
-      <details className="card">
-        <summary className="cursor-pointer font-medium text-sky-700">+ Novo contato</summary>
-        <ActionForm action={createContactAction} className="mt-4 grid gap-3 md:grid-cols-3" submitLabel="Criar contato">
-          <input name="name" required placeholder="Nome *" className="input" />
-          <input name="phone" placeholder="WhatsApp (ex.: 5511988887777)" className="input" />
-          <input name="email" type="email" placeholder="E-mail" className="input" />
-          <input name="company" placeholder="Empresa" className="input" />
-          <input name="source" placeholder="Origem (ex.: Instagram)" className="input" />
-          <input name="value" inputMode="decimal" placeholder="Valor (R$)" className="input" />
-          <select name="stage_id" className="input" defaultValue="">
-            <option value="">Etapa inicial (padrão)</option>
-            {stages.map((s) => (
-              <option key={s.id} value={s.id}>{s.name}</option>
-            ))}
-          </select>
-          <select name="tag_ids[]" multiple className="input md:col-span-2" size={Math.min(4, Math.max(2, tags.length))}>
-            {tags.map((t) => (
-              <option key={t.id} value={t.id}>{t.name}</option>
-            ))}
-          </select>
-          <textarea name="notes" placeholder="Observações" className="input md:col-span-3" rows={2} />
+      <details className="card group">
+        <summary className="flex cursor-pointer list-none items-center gap-2 font-medium text-accent-strong marker:hidden">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-500/15 text-accent transition group-open:rotate-45">
+            <Plus className="h-4 w-4" />
+          </span>
+          Novo contato
+        </summary>
+        <ActionForm
+          action={createContactAction}
+          className="mt-5 grid gap-3 md:grid-cols-3"
+          submitLabel="Criar contato"
+          submitIcon={<UserPlus className="h-4 w-4" />}
+          submitClassName="btn-primary md:col-start-3"
+        >
+          <label><span className="label">Nome *</span><input name="name" required placeholder="Nome completo" className="input" /></label>
+          <label><span className="label">WhatsApp</span><input name="phone" placeholder="55 11 98888-7777" className="input" /></label>
+          <label><span className="label">E-mail</span><input name="email" type="email" placeholder="email@exemplo.com" className="input" /></label>
+          <label><span className="label">Empresa</span><input name="company" placeholder="Empresa" className="input" /></label>
+          <label><span className="label">Origem</span><input name="source" placeholder="Instagram, indicação…" className="input" /></label>
+          <label><span className="label">Valor (R$)</span><input name="value" inputMode="decimal" placeholder="0,00" className="input" /></label>
+          <label><span className="label">Etapa inicial</span>
+            <select name="stage_id" className="input" defaultValue="">
+              <option value="">Primeira etapa do funil</option>
+              {stages.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+          </label>
+          <label className="md:col-span-2"><span className="label">Tags (Ctrl+clique para várias)</span>
+            <select name="tag_ids[]" multiple className="input" size={Math.min(4, Math.max(2, tags.length))}>
+              {tags.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </select>
+          </label>
+          <label className="md:col-span-3"><span className="label">Observações</span><textarea name="notes" rows={2} className="input" /></label>
         </ActionForm>
       </details>
 
-      <form className="flex flex-wrap gap-2">
-        <input name="q" defaultValue={typeof sp.q === "string" ? sp.q : ""} placeholder="Buscar por nome, e-mail, telefone…" className="input max-w-xs" />
-        <select name="etapa" defaultValue={typeof sp.etapa === "string" ? sp.etapa : ""} className="input max-w-[12rem]">
+      <form className="flex flex-wrap items-center gap-2">
+        <span className="relative min-w-60 flex-1">
+          <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-subtle" />
+          <input name="q" defaultValue={str(sp.q) ?? ""} placeholder="Buscar por nome, e-mail, telefone ou empresa" className="input pl-10" />
+        </span>
+        <select name="etapa" defaultValue={str(sp.etapa) ?? ""} className="input w-auto min-w-44">
           <option value="">Todas as etapas</option>
-          {stages.map((s) => (
-            <option key={s.id} value={s.id}>{s.name}</option>
-          ))}
+          {stages.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
         </select>
-        <select name="tag" defaultValue={typeof sp.tag === "string" ? sp.tag : ""} className="input max-w-[12rem]">
+        <select name="tag" defaultValue={str(sp.tag) ?? ""} className="input w-auto min-w-40">
           <option value="">Todas as tags</option>
-          {tags.map((t) => (
-            <option key={t.id} value={t.id}>{t.name}</option>
-          ))}
+          {tags.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
         </select>
-        <button className="btn-secondary">Filtrar</button>
+        <button className="btn-secondary"><Filter className="h-4 w-4" /> Filtrar</button>
       </form>
 
-      <div className="card overflow-x-auto p-0">
-        <table className="min-w-full text-sm">
-          <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
-            <tr>
-              <th className="px-4 py-3">Nome</th>
-              <th className="px-4 py-3">Telefone</th>
-              <th className="px-4 py-3">Etapa</th>
-              <th className="px-4 py-3">Tags</th>
-              <th className="px-4 py-3 text-right">Valor</th>
-              <th className="px-4 py-3">Última interação</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {items.map((c) => {
-              const st = c.stage_id ? stageName.get(c.stage_id) : undefined;
-              return (
-                <tr key={c.id} className="hover:bg-slate-50">
-                  <td className="px-4 py-3">
-                    <Link href={`/contatos/${c.id}`} className="font-medium text-sky-700 hover:underline">{c.name}</Link>
-                    {c.company && <p className="text-xs text-slate-500">{c.company}</p>}
-                  </td>
-                  <td className="px-4 py-3 whitespace-nowrap">{phoneFmt(c.phone)}</td>
-                  <td className="px-4 py-3">
-                    {st && <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full" style={{ backgroundColor: st.color }} />{st.name}</span>}
-                  </td>
-                  <td className="px-4 py-3"><div className="flex flex-wrap gap-1">{c.tags?.map((t) => <TagBadge key={t.id} {...t} />)}</div></td>
-                  <td className="px-4 py-3 text-right tabular-nums">{brl(c.value_cents)}</td>
-                  <td className="px-4 py-3 whitespace-nowrap text-slate-500">{dateTime(c.last_interaction_at)}</td>
+      <div className="card overflow-hidden p-0">
+        {items.length === 0 ? (
+          <EmptyState icon={Users} title="Nenhum contato encontrado" hint="Cadastre o primeiro contato acima ou ajuste os filtros." />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead className="table-head">
+                <tr>
+                  <th className="px-5 py-3">Contato</th>
+                  <th className="px-5 py-3">Telefone</th>
+                  <th className="px-5 py-3">Etapa</th>
+                  <th className="px-5 py-3">Tags</th>
+                  <th className="px-5 py-3 text-right">Valor</th>
+                  <th className="px-5 py-3">Última interação</th>
                 </tr>
-              );
-            })}
-            {items.length === 0 && (
-              <tr><td colSpan={6} className="px-4 py-10 text-center text-slate-500">Nenhum contato encontrado.</td></tr>
-            )}
-          </tbody>
-        </table>
+              </thead>
+              <tbody className="divide-y divide-line">
+                {items.map((c) => {
+                  const st = c.stage_id ? stageById.get(c.stage_id) : undefined;
+                  return (
+                    <tr key={c.id} className="transition hover:bg-surface-2/60">
+                      <td className="px-5 py-3">
+                        <Link href={`/contatos/${c.id}`} className="flex items-center gap-3">
+                          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent-soft text-accent-strong text-xs font-semibold">
+                            {initials(c.name)}
+                          </span>
+                          <span>
+                            <span className="block font-medium text-fg hover:text-accent-strong">{c.name}</span>
+                            {c.company && <span className="block text-xs text-muted">{c.company}</span>}
+                          </span>
+                        </Link>
+                      </td>
+                      <td className="whitespace-nowrap px-5 py-3 text-muted">{phoneFmt(c.phone)}</td>
+                      <td className="px-5 py-3">
+                        {st && (
+                          <span className="chip">
+                            <span className="h-2 w-2 rounded-full" style={{ backgroundColor: st.color }} />
+                            {st.name}
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-5 py-3"><div className="flex flex-wrap gap-1">{c.tags?.map((t) => <TagBadge key={t.id} {...t} />)}</div></td>
+                      <td className="px-5 py-3 text-right tabular-nums">{brl(c.value_cents)}</td>
+                      <td className="whitespace-nowrap px-5 py-3 text-muted">{dateTime(c.last_interaction_at)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );

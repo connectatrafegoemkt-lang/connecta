@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react";
 import QRCode from "qrcode";
+import { Loader2, Lock, QrCode, Smartphone, Wifi, WifiOff } from "lucide-react";
 import { supabaseBrowser } from "@/lib/supabase-browser";
 import { whatsappConnectAction, whatsappDisconnectAction } from "../actions";
 
@@ -20,12 +21,12 @@ const LABEL: Record<Status, string> = {
   conectado: "Conectado",
   erro: "Erro",
 };
-const COLOR: Record<Status, string> = {
-  desconectado: "bg-slate-400",
-  aguardando_qr: "bg-amber-400",
-  conectando: "bg-sky-400",
-  conectado: "bg-emerald-500",
-  erro: "bg-red-500",
+const TONE: Record<Status, string> = {
+  desconectado: "border-line bg-surface-2 text-muted",
+  aguardando_qr: "border-warning/40 bg-warning/10 text-warning",
+  conectando: "border-brand-500/40 bg-brand-500/10 text-accent-strong",
+  conectado: "border-success/40 bg-success/10 text-success",
+  erro: "border-danger/40 bg-danger/10 text-danger",
 };
 
 /**
@@ -83,47 +84,65 @@ export function ConnectionPanel({ initial, isAdmin, tenantId }: { initial: State
       if (!r.error && fn === whatsappConnectAction) setState((s) => ({ ...s, status: s.status === "conectado" ? s.status : "conectando" }));
     });
 
+  const StatusIcon = state.status === "conectado" ? Wifi : state.status === "conectando" ? Loader2 : state.status === "aguardando_qr" ? QrCode : WifiOff;
+
   return (
-    <section className="card">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <p className="flex items-center gap-2 font-semibold">
-            <span className={`h-2.5 w-2.5 rounded-full ${COLOR[state.status]}`} />
-            {LABEL[state.status]}
-          </p>
-          {state.phone && state.status === "conectado" && <p className="text-sm text-slate-500">Número: +{state.phone}</p>}
-          {state.last_error && state.status !== "conectado" && <p className="text-sm text-amber-700">{state.last_error}</p>}
+    <section className="card relative overflow-hidden">
+      {state.status === "conectado" && <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-success/10 blur-3xl" />}
+      <div className="relative flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <span className={`flex h-12 w-12 items-center justify-center rounded-2xl border ${TONE[state.status]}`}>
+            <StatusIcon className={`h-5 w-5 ${state.status === "conectando" ? "animate-spin" : ""}`} />
+          </span>
+          <div>
+            <p className="text-xs font-medium uppercase tracking-wider text-subtle">Status da conexão</p>
+            <p className="text-lg font-semibold">{LABEL[state.status]}</p>
+            {state.phone && state.status === "conectado" && <p className="text-sm text-muted">Número conectado: +{state.phone}</p>}
+            {state.last_error && state.status !== "conectado" && <p className="text-sm text-warning">{state.last_error}</p>}
+          </div>
         </div>
         {isAdmin ? (
-          <div className="flex gap-2">
-            {state.status === "desconectado" || state.status === "erro" ? (
-              <button disabled={pending} onClick={() => run(whatsappConnectAction)} className="btn-primary">
-                Conectar WhatsApp
-              </button>
-            ) : (
-              <button disabled={pending} onClick={() => run(whatsappDisconnectAction)} className="btn-secondary">
-                Desconectar
-              </button>
-            )}
-          </div>
+          state.status === "desconectado" || state.status === "erro" ? (
+            <button disabled={pending} onClick={() => run(whatsappConnectAction)} className="btn-primary">
+              {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <QrCode className="h-4 w-4" />} Conectar WhatsApp
+            </button>
+          ) : (
+            <button disabled={pending} onClick={() => run(whatsappDisconnectAction)} className="btn-secondary">
+              <WifiOff className="h-4 w-4" /> Desconectar
+            </button>
+          )
         ) : (
-          <p className="text-sm text-slate-500">Somente administradores conectam o número.</p>
+          <span className="chip"><Lock className="h-3 w-3" /> Somente administradores conectam o número</span>
         )}
       </div>
-      {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+      {error && <p className="relative mt-3 text-sm text-danger">{error}</p>}
       {isAdmin && state.status === "aguardando_qr" && (
-        <div className="mt-6 flex flex-col items-center gap-3 md:flex-row md:items-start md:gap-8">
-          {qrSvg ? (
-            <div className="rounded-lg bg-white p-2 ring-1 ring-slate-200" dangerouslySetInnerHTML={{ __html: qrSvg }} />
-          ) : (
-            <div className="flex h-64 w-64 items-center justify-center rounded-lg bg-slate-100 text-sm text-slate-500">Gerando QR…</div>
-          )}
-          <ol className="list-decimal space-y-1 pl-5 text-sm text-slate-600">
-            <li>Abra o WhatsApp no celular da empresa.</li>
-            <li>Toque em <strong>Mais opções</strong> → <strong>Dispositivos conectados</strong>.</li>
-            <li>Toque em <strong>Conectar um dispositivo</strong> e aponte para este QR code.</li>
-            <li>O QR é renovado automaticamente; mantenha esta tela aberta.</li>
-          </ol>
+        <div className="relative mt-6 grid items-center gap-8 border-t border-line pt-6 md:grid-cols-[auto_1fr]">
+          <div className="mx-auto rounded-2xl bg-white p-3 shadow-[0_0_48px_-8px_rgb(161_0_255/0.7)]">
+            {qrSvg ? (
+              <div className="h-64 w-64 [&>svg]:h-full [&>svg]:w-full" dangerouslySetInnerHTML={{ __html: qrSvg }} />
+            ) : (
+              <div className="flex h-64 w-64 items-center justify-center text-sm text-slate-500">
+                <Loader2 className="h-6 w-6 animate-spin text-accent" />
+              </div>
+            )}
+          </div>
+          <div>
+            <p className="flex items-center gap-2 font-semibold"><Smartphone className="h-4 w-4 text-accent" /> Conecte o celular da empresa</p>
+            <ol className="mt-4 space-y-3 text-sm text-muted">
+              {[
+                "Abra o WhatsApp no celular da empresa.",
+                "Toque em Mais opções (⋮) ou Configurações → Dispositivos conectados.",
+                "Toque em Conectar um dispositivo e aponte a câmera para este QR code.",
+                "O QR é renovado automaticamente. Mantenha esta tela aberta até conectar.",
+              ].map((t, i) => (
+                <li key={i} className="flex gap-3">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-500/15 text-xs font-semibold text-accent-strong">{i + 1}</span>
+                  {t}
+                </li>
+              ))}
+            </ol>
+          </div>
         </div>
       )}
     </section>

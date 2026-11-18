@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useOptimistic, useState, useTransition } from "react";
+import { Building2, GripVertical, Inbox, TriangleAlert, Trophy, Ban } from "lucide-react";
 import { moveContactAction } from "../actions";
 import { brl } from "@/components/format";
 import { TagBadge } from "@/components/tag-badge";
@@ -19,6 +20,8 @@ interface Stage {
   id: string;
   name: string;
   color: string;
+  is_won?: boolean;
+  is_lost?: boolean;
 }
 
 export function KanbanBoard({ stages, contacts }: { stages: Stage[]; contacts: Card[] }) {
@@ -50,12 +53,14 @@ export function KanbanBoard({ stages, contacts }: { stages: Stage[]; contacts: C
 
   return (
     <>
-      {error && <p className="text-sm text-red-600">{error}</p>}
-      <div className="flex gap-4 overflow-x-auto pb-4">
+      {error && (
+        <p className="flex items-center gap-1.5 text-sm text-danger">
+          <TriangleAlert className="h-4 w-4" /> {error}
+        </p>
+      )}
+      <div className="-mx-4 flex gap-4 overflow-x-auto px-4 pb-4 md:mx-0 md:px-0">
         {stages.map((s) => {
-          const column = cards
-            .filter((c) => c.stage_id === s.id)
-            .sort((a, b) => a.stage_position - b.stage_position);
+          const column = cards.filter((c) => c.stage_id === s.id).sort((a, b) => a.stage_position - b.stage_position);
           const total = column.reduce((acc, c) => acc + c.value_cents, 0);
           return (
             <section
@@ -69,17 +74,20 @@ export function KanbanBoard({ stages, contacts }: { stages: Stage[]; contacts: C
                 e.preventDefault();
                 drop(s.id, column.length);
               }}
-              className={`flex w-72 shrink-0 flex-col rounded-xl bg-slate-100 p-3 ${over === s.id ? "ring-2 ring-sky-400" : ""}`}
+              className={`flex w-72 shrink-0 flex-col rounded-2xl border bg-surface-2/70 p-3 transition ${
+                over === s.id ? "border-brand-500/60 shadow-[0_0_0_1px_rgb(161_0_255/0.3),0_0_32px_-8px_rgb(161_0_255/0.6)]" : "border-line"
+              }`}
             >
-              <header className="mb-3 flex items-center justify-between">
+              <div className="mb-3 h-1 rounded-full" style={{ backgroundColor: s.color }} />
+              <header className="mb-3 flex items-center justify-between px-1">
                 <h2 className="flex items-center gap-2 text-sm font-semibold">
-                  <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: s.color }} />
+                  {s.is_won ? <Trophy className="h-4 w-4 text-success" /> : s.is_lost ? <Ban className="h-4 w-4 text-danger" /> : <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: s.color }} />}
                   {s.name}
-                  <span className="text-slate-400">{column.length}</span>
+                  <span className="rounded-full bg-surface px-2 py-0.5 text-[11px] font-medium text-muted">{column.length}</span>
                 </h2>
-                <span className="text-xs tabular-nums text-slate-500">{brl(total)}</span>
+                <span className="text-xs tabular-nums text-muted">{brl(total)}</span>
               </header>
-              <ul className="flex min-h-16 flex-col gap-2">
+              <ul className="flex min-h-24 flex-1 flex-col gap-2">
                 {column.map((c, idx) => (
                   <li
                     key={c.id}
@@ -91,22 +99,36 @@ export function KanbanBoard({ stages, contacts }: { stages: Stage[]; contacts: C
                       e.stopPropagation();
                       drop(s.id, idx);
                     }}
-                    className={`cursor-grab rounded-lg bg-white p-3 shadow-sm ring-1 ring-slate-200 active:cursor-grabbing ${dragging === c.id ? "opacity-50" : ""}`}
+                    className={`group cursor-grab rounded-xl border border-line bg-surface p-3 shadow-sm transition hover:border-brand-500/40 hover:shadow-md active:cursor-grabbing ${dragging === c.id ? "opacity-40" : ""}`}
                   >
-                    <Link href={`/contatos/${c.id}`} className="text-sm font-medium hover:underline">
-                      {c.name}
-                    </Link>
-                    {c.company && <p className="text-xs text-slate-500">{c.company}</p>}
-                    <div className="mt-2 flex items-center justify-between gap-2">
-                      <div className="flex flex-wrap gap-1">
-                        {c.tags.slice(0, 3).map((t) => (
-                          <TagBadge key={t.id} {...t} />
-                        ))}
-                      </div>
-                      {c.value_cents > 0 && <span className="text-xs tabular-nums text-slate-600">{brl(c.value_cents)}</span>}
+                    <div className="flex items-start justify-between gap-2">
+                      <Link href={`/contatos/${c.id}`} className="text-sm font-medium text-fg hover:text-accent-strong">
+                        {c.name}
+                      </Link>
+                      <GripVertical className="h-4 w-4 shrink-0 text-subtle opacity-0 transition group-hover:opacity-100" />
                     </div>
+                    {c.company && (
+                      <p className="mt-0.5 flex items-center gap-1 text-xs text-muted">
+                        <Building2 className="h-3 w-3" /> {c.company}
+                      </p>
+                    )}
+                    {(c.tags.length > 0 || c.value_cents > 0) && (
+                      <div className="mt-3 flex items-center justify-between gap-2">
+                        <div className="flex flex-wrap gap-1">
+                          {c.tags.slice(0, 3).map((t) => (
+                            <TagBadge key={t.id} {...t} />
+                          ))}
+                        </div>
+                        {c.value_cents > 0 && <span className="text-xs font-medium tabular-nums text-accent-strong">{brl(c.value_cents)}</span>}
+                      </div>
+                    )}
                   </li>
                 ))}
+                {column.length === 0 && (
+                  <li className="flex flex-1 flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-line py-6 text-xs text-subtle">
+                    <Inbox className="h-4 w-4" /> Solte um card aqui
+                  </li>
+                )}
               </ul>
             </section>
           );
