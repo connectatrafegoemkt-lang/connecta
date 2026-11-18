@@ -131,3 +131,16 @@ describe("generateReply", () => {
     expect(create).not.toHaveBeenCalled();
   });
 });
+
+describe("aiEnabledFor (IA por número)", () => {
+  it("só atende quando a equipe ativou e não está pausada", async () => {
+    const { aiEnabledFor } = await import("../hours");
+    const now = Date.parse("2026-11-18T12:00:00Z");
+    expect(aiEnabledFor({ ai_enabled: false }, now)).toBe(false);
+    expect(aiEnabledFor({}, now)).toBe(false);
+    expect(aiEnabledFor({ ai_enabled: true, ai_paused_until: null }, now)).toBe(true);
+    expect(aiEnabledFor({ ai_enabled: true, ai_paused_until: "infinity" }, now)).toBe(false);
+    expect(aiEnabledFor({ ai_enabled: true, ai_paused_until: "2026-11-18T13:00:00Z" }, now)).toBe(false);
+    expect(aiEnabledFor({ ai_enabled: true, ai_paused_until: "2026-11-18T11:00:00Z" }, now)).toBe(true);
+  });
+});

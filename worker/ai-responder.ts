@@ -1,6 +1,6 @@
 import type { Logger } from "pino";
 import { generateReply, type ChatClient } from "../src/shared/ai/agent";
-import { aiShouldAct, isAiPaused } from "../src/shared/ai/hours";
+import { aiEnabledFor, aiShouldAct } from "../src/shared/ai/hours";
 import { settingsFromRow } from "../src/shared/ai/settings";
 import type { WorkerTenantRepo } from "./repo";
 
@@ -41,7 +41,8 @@ export class AiResponder {
     if (settings.mode === "desligado") return;
     const until = new Date(Date.now() + settings.human_pause_hours * 3600_000).toISOString();
     const state = await this.repo.getContactAiState(contactId);
-    if (state?.ai_paused_until === "infinity") return; // já pausada até reativarem
+    if (!state?.ai_enabled) return; // IA não atende este número
+    if (state.ai_paused_until === "infinity") return; // já pausada até reativarem
     await this.repo.setContactAiPause(contactId, until);
   }
 
@@ -58,7 +59,8 @@ export class AiResponder {
       if (!aiShouldAct(settings)) return;
       const contact = await this.repo.getContactAiState(contactId);
       if (!contact) return;
-      if (isAiPaused(contact.ai_paused_until)) return;
+      // Só atende números em que a equipe ativou a IA (e que não estão pausados).
+      if (!aiEnabledFor(contact)) return;
 
       const history = await this.repo.listWhatsappHistory(contactId, 30);
       if (history.at(-1)?.direction !== "entrada") return; // já respondido

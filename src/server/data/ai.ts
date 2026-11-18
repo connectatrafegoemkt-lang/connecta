@@ -52,10 +52,10 @@ export async function setSuggestionStatus(ctx: TenantContext, id: string, status
   if (!data?.length) throw notFound("Sugestão não encontrada");
 }
 
-/** Pausa ou reativa a IA numa conversa (qualquer membro do tenant). */
+/** Ativa ou desativa a IA neste número (a IA só atende contatos ativados). */
 export async function setContactAi(ctx: TenantContext, contactId: string, active: boolean) {
   const { data, error } = await ctx.db
-    .update("contacts", { ai_paused_until: active ? null : "infinity" })
+    .update("contacts", { ai_enabled: active, ai_paused_until: null })
     .eq("id", contactId)
     .select("id");
   if (error) throw fromDbError(error);

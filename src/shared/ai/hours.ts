@@ -43,3 +43,8 @@ export function isAiPaused(until: string | null | undefined, now = Date.now()): 
   if (until === "infinity") return true;
   return new Date(until).getTime() > now;
 }
+
+/** A IA atende este contato agora? Só se a equipe ativou nele e não está pausada. */
+export function aiEnabledFor(contact: { ai_enabled?: boolean | null; ai_paused_until?: string | null }, now = Date.now()): boolean {
+  return contact.ai_enabled === true && !isAiPaused(contact.ai_paused_until, now);
+}
