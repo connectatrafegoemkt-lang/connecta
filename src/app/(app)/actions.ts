@@ -27,6 +27,7 @@ import { createStage, deleteStage, reorderStages, updateStage } from "@/server/d
 import { createTag, deleteTag } from "@/server/data/tags";
 import { inviteMember, removeMember, updateMember } from "@/server/data/members";
 import { queueWhatsappMessage, requestWhatsapp } from "@/server/data/whatsapp";
+import { saveAiSettings, setContactAi, setSuggestionStatus, testAiReply } from "@/server/data/ai";
 
 /*
  * Server Actions. Regras:
@@ -276,6 +277,51 @@ export async function whatsappSendAction(_: ActionState, fd: FormData): Promise<
     const ctx = await getTenantContext();
     const { contact_id, body } = parseOrThrow(whatsappSendSchema, pick(fd, ["contact_id", "body"]));
     await queueWhatsappMessage(ctx, contact_id, body);
+    return { ok: true };
+  } catch (e) {
+    return toActionError(e);
+  }
+}
+
+// ------------------------------------------------------- Atendimento por IA
+export async function saveAiSettingsAction(input: unknown): Promise<ActionState> {
+  try {
+    await saveAiSettings(await getTenantContext(), input);
+    revalidatePath("/atendimento-ia");
+    return { ok: true, message: "Configuração salva." };
+  } catch (e) {
+    return toActionError(e);
+  }
+}
+
+export async function testAiAction(
+  settings: unknown,
+  history: { direction: "entrada" | "saida"; body: string }[],
+): Promise<ActionState & { reply?: string; handoff?: boolean; reason?: string }> {
+  try {
+    const safe = (Array.isArray(history) ? history : [])
+      .slice(-20)
+      .map((h) => ({ direction: h?.direction === "saida" ? ("saida" as const) : ("entrada" as const), body: String(h?.body ?? "").slice(0, 2000) }));
+    const r = await testAiReply(await getTenantContext(), settings, safe);
+    return { ok: true, ...r };
+  } catch (e) {
+    return toActionError(e);
+  }
+}
+
+export async function setContactAiAction(contactId: string, active: boolean): Promise<ActionState> {
+  try {
+    await setContactAi(await getTenantContext(), parseOrThrow(idSchema, contactId), active);
+    revalidatePath("/whatsapp");
+    return { ok: true };
+  } catch (e) {
+    return toActionError(e);
+  }
+}
+
+export async function setSuggestionStatusAction(id: string, status: "usada" | "descartada"): Promise<ActionState> {
+  try {
+    await setSuggestionStatus(await getTenantContext(), parseOrThrow(idSchema, id), status === "usada" ? "usada" : "descartada");
     return { ok: true };
   } catch (e) {
     return toActionError(e);

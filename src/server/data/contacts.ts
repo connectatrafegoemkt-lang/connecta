@@ -17,13 +17,14 @@ export interface Contact {
   stage_position: number;
   owner_id: string | null;
   last_interaction_at: string | null;
+  ai_paused_until?: string | null;
   created_at: string;
   updated_at: string;
   tags?: { id: string; name: string; color: string }[];
 }
 
 const COLUMNS =
-  "id, tenant_id, name, email, phone, company, source, notes, value_cents, stage_id, stage_position, owner_id, last_interaction_at, created_at, updated_at";
+  "id, tenant_id, name, email, phone, company, source, notes, value_cents, stage_id, stage_position, owner_id, last_interaction_at, ai_paused_until, created_at, updated_at";
 const WITH_TAGS = `${COLUMNS}, contact_tags(tags(id, name, color))`;
 
 type RawContact = Contact & { contact_tags?: { tags: { id: string; name: string; color: string } | null }[] };

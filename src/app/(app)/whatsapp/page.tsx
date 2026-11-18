@@ -9,6 +9,7 @@ import {
   listThread,
 } from "@/server/data/whatsapp";
 import { idSchema } from "@/server/validation";
+import { getAiSettings, listPendingSuggestion } from "@/server/data/ai";
 import { ExternalLink, Inbox, MessageCircle, MessageSquareText, Phone } from "lucide-react";
 import { dateTime, phoneFmt } from "@/components/format";
 import { PageHeader } from "@/components/page-header";
@@ -16,6 +17,7 @@ import { EmptyState } from "@/components/empty-state";
 import { ConnectionPanel } from "./connection-panel";
 import { ChatThread } from "./chat-thread";
 import { LiveRefresh } from "./live-refresh";
+import { AiToggle } from "./ai-toggle";
 
 export const metadata = { title: "WhatsApp" };
 
@@ -24,19 +26,25 @@ export default async function WhatsappPage({ searchParams }: PageProps<"/whatsap
   const sp = await searchParams;
   const selected = idSchema.safeParse(sp.contato).success ? (sp.contato as string) : null;
 
-  const [session, qr, conversations] = await Promise.all([
+  const [session, qr, conversations, aiSettings] = await Promise.all([
     getWhatsappSession(ctx),
     getWhatsappQr(ctx),
     listConversations(ctx),
+    getAiSettings(ctx),
   ]);
 
   let contact = null;
   let thread: Awaited<ReturnType<typeof listThread>> = [];
   let pending: Awaited<ReturnType<typeof listPendingOutbox>> = [];
+  let suggestion: Awaited<ReturnType<typeof listPendingSuggestion>> = null;
   if (selected) {
     try {
       contact = await getContact(ctx, selected);
-      [thread, pending] = await Promise.all([listThread(ctx, selected), listPendingOutbox(ctx, selected)]);
+      [thread, pending, suggestion] = await Promise.all([
+        listThread(ctx, selected),
+        listPendingOutbox(ctx, selected),
+        aiSettings.mode === "sugerir" ? listPendingSuggestion(ctx, selected) : Promise.resolve(null),
+      ]);
     } catch {
       contact = null; // contato inexistente ou de outro tenant
     }
@@ -107,15 +115,24 @@ export default async function WhatsappPage({ searchParams }: PageProps<"/whatsap
                     <p className="flex items-center gap-1 text-xs text-muted"><Phone className="h-3 w-3" /> {phoneFmt(contact.phone)}</p>
                   </div>
                 </div>
-                <Link href={`/contatos/${contact.id}`} className="btn-ghost btn-sm">
-                  Ver contato <ExternalLink className="h-3.5 w-3.5" />
-                </Link>
+                <div className="flex items-center gap-1">
+                  {aiSettings.mode !== "desligado" && (
+                    <AiToggle
+                      contactId={contact.id}
+                      active={!contact.ai_paused_until || (contact.ai_paused_until !== "infinity" && new Date(contact.ai_paused_until).getTime() < Date.now())}
+                    />
+                  )}
+                  <Link href={`/contatos/${contact.id}`} className="btn-ghost btn-sm">
+                    Ver contato <ExternalLink className="h-3.5 w-3.5" />
+                  </Link>
+                </div>
               </header>
               <ChatThread
                 contactId={contact.id}
                 canSend={session.status === "conectado" && !!contact.phone}
                 messages={thread}
                 pending={pending}
+                suggestion={suggestion}
               />
             </>
           ) : (

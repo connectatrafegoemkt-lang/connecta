@@ -103,11 +103,12 @@ export interface ThreadMessage {
   body: string;
   status: string | null;
   occurred_at: string;
+  metadata?: { ai?: boolean } | null;
 }
 
 export async function listThread(ctx: TenantContext, contactId: string): Promise<ThreadMessage[]> {
   const { data, error } = await ctx.db
-    .select("interactions", "id, direction, body, status, occurred_at")
+    .select("interactions", "id, direction, body, status, occurred_at, metadata")
     .eq("contact_id", contactId)
     .eq("type", "whatsapp")
     .order("occurred_at", { ascending: true })

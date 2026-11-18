@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  Bot,
   LayoutDashboard,
   ListTodo,
   MessageCircle,
@@ -18,6 +19,7 @@ export const NAV: { href: string; label: string; icon: LucideIcon }[] = [
   { href: "/funil", label: "Funil", icon: SquareKanban },
   { href: "/tarefas", label: "Tarefas", icon: ListTodo },
   { href: "/whatsapp", label: "WhatsApp", icon: MessageCircle },
+  { href: "/atendimento-ia", label: "Atendimento IA", icon: Bot },
   { href: "/configuracoes", label: "Configurações", icon: Settings },
 ];
 
