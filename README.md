@@ -67,7 +67,10 @@ supabase status -o env         # copie API_URL, ANON_KEY e SERVICE_ROLE_KEY
 cp .env.example .env.local     # preencha com os valores acima (NUNCA commite)
 ```
 
-Crie o primeiro cliente (tenant) e seu admin:
+Clientes novos podem ser criados pelo **Painel da CONNECTA** (`/plataforma`),
+disponível só para administradores da plataforma (tabela `app.platform_admins`,
+incluídos via SQL Editor). Pelo terminal também funciona —
+crie o primeiro cliente (tenant) e seu admin:
 
 ```bash
 SUPABASE_URL=http://127.0.0.1:54321 SUPABASE_SERVICE_ROLE_KEY=... \
