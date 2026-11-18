@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import { Check, CheckCheck, Clock, Send, TriangleAlert } from "lucide-react";
+import { useEffect, useRef, useState, useTransition } from "react";
+import { Bot, Check, CheckCheck, Clock, Send, Sparkles, TriangleAlert, X } from "lucide-react";
 import { ActionForm } from "@/components/action-form";
 import { dateTime } from "@/components/format";
-import { whatsappSendAction } from "../actions";
+import { setSuggestionStatusAction, whatsappSendAction } from "../actions";
 
 function StatusIcon({ status }: { status: string | null }) {
   if (status === "lido") return <CheckCheck className="h-3.5 w-3.5 text-brand-200" aria-label="lida" />;
@@ -19,13 +19,39 @@ export function ChatThread({
   canSend,
   messages,
   pending,
+  suggestion = null,
 }: {
   contactId: string;
   canSend: boolean;
-  messages: { id: string; direction: string; body: string; status: string | null; occurred_at: string }[];
+  messages: { id: string; direction: string; body: string; status: string | null; occurred_at: string; metadata?: { ai?: boolean } | null }[];
   pending: { id: string; body: string; status: string; error: string | null }[];
+  suggestion?: { id: string; body: string } | null;
 }) {
   const end = useRef<HTMLDivElement>(null);
+  const formWrap = useRef<HTMLDivElement>(null);
+  const [hidden, setHidden] = useState<string | null>(null);
+  const [, start] = useTransition();
+  const showSuggestion = suggestion && suggestion.id !== hidden;
+
+  function applySuggestion() {
+    if (!suggestion) return;
+    const input = formWrap.current?.querySelector<HTMLInputElement>('input[name="body"]');
+    if (input) {
+      input.value = suggestion.body;
+      input.focus();
+    }
+    setHidden(suggestion.id);
+    start(async () => {
+      await setSuggestionStatusAction(suggestion.id, "usada");
+    });
+  }
+  function discard() {
+    if (!suggestion) return;
+    setHidden(suggestion.id);
+    start(async () => {
+      await setSuggestionStatusAction(suggestion.id, "descartada");
+    });
+  }
   useEffect(() => end.current?.scrollIntoView({ block: "end" }), [messages.length, pending.length]);
 
   return (
@@ -51,6 +77,11 @@ export function ChatThread({
               >
                 <p className="whitespace-pre-wrap break-words">{m.body}</p>
                 <p className={`mt-1 flex items-center justify-end gap-1 text-[10px] ${out ? "text-brand-100/80" : "text-subtle"}`}>
+                  {out && m.metadata?.ai && (
+                    <span className="mr-auto inline-flex items-center gap-0.5 rounded-full bg-white/20 px-1.5 py-px font-medium text-white">
+                      <Bot className="h-3 w-3" /> IA
+                    </span>
+                  )}
                   {dateTime(m.occurred_at)} {out && <StatusIcon status={m.status} />}
                 </p>
               </div>
@@ -76,7 +107,23 @@ export function ChatThread({
         )}
         <div ref={end} />
       </div>
-      <div className="border-t border-line bg-surface p-3">
+      <div ref={formWrap} className="border-t border-line bg-surface p-3">
+        {showSuggestion && canSend && (
+          <div className="mb-3 rounded-xl border border-brand-500/40 bg-accent-soft p-3">
+            <p className="flex items-center gap-1.5 text-xs font-semibold text-accent-strong">
+              <Sparkles className="h-3.5 w-3.5" /> Sugestão da IA
+            </p>
+            <p className="mt-1 whitespace-pre-wrap text-sm text-fg">{suggestion!.body}</p>
+            <div className="mt-2 flex gap-2">
+              <button type="button" onClick={applySuggestion} className="btn-primary btn-sm">
+                <Check className="h-3.5 w-3.5" /> Usar e revisar
+              </button>
+              <button type="button" onClick={discard} className="btn-ghost btn-sm">
+                <X className="h-3.5 w-3.5" /> Descartar
+              </button>
+            </div>
+          </div>
+        )}
         {canSend ? (
           <ActionForm action={whatsappSendAction} resetOnSuccess className="flex items-center gap-2" submitLabel="Enviar" submitIcon={<Send className="h-4 w-4" />}>
             <input type="hidden" name="contact_id" value={contactId} />

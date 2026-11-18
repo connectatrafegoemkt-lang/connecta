@@ -36,3 +36,10 @@ export function aiShouldAct(settings: AiSettings, date = new Date()): boolean {
   }
   return true;
 }
+
+/** A IA está pausada nesta conversa agora? ("infinity" = até alguém reativar) */
+export function isAiPaused(until: string | null | undefined, now = Date.now()): boolean {
+  if (!until) return false;
+  if (until === "infinity") return true;
+  return new Date(until).getTime() > now;
+}

@@ -10,6 +10,7 @@ import {
 } from "@/server/data/whatsapp";
 import { idSchema } from "@/server/validation";
 import { getAiSettings, listPendingSuggestion } from "@/server/data/ai";
+import { isAiPaused } from "@/shared/ai/hours";
 import { ExternalLink, Inbox, MessageCircle, MessageSquareText, Phone } from "lucide-react";
 import { dateTime, phoneFmt } from "@/components/format";
 import { PageHeader } from "@/components/page-header";
@@ -119,7 +120,7 @@ export default async function WhatsappPage({ searchParams }: PageProps<"/whatsap
                   {aiSettings.mode !== "desligado" && (
                     <AiToggle
                       contactId={contact.id}
-                      active={!contact.ai_paused_until || (contact.ai_paused_until !== "infinity" && new Date(contact.ai_paused_until).getTime() < Date.now())}
+                      active={!isAiPaused(contact.ai_paused_until)}
                     />
                   )}
                   <Link href={`/contatos/${contact.id}`} className="btn-ghost btn-sm">
