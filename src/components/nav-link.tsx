@@ -9,6 +9,7 @@ import {
   MessageCircle,
   Settings,
   SquareKanban,
+  UserCog,
   Users,
   type LucideIcon,
 } from "lucide-react";
@@ -20,6 +21,7 @@ export const NAV: { href: string; label: string; icon: LucideIcon }[] = [
   { href: "/tarefas", label: "Tarefas", icon: ListTodo },
   { href: "/whatsapp", label: "WhatsApp", icon: MessageCircle },
   { href: "/atendimento-ia", label: "Atendimento IA", icon: Bot },
+  { href: "/equipe", label: "Equipe", icon: UserCog },
   { href: "/configuracoes", label: "Configurações", icon: Settings },
 ];
 
@@ -62,20 +64,21 @@ export function MobileNavLink({ href, label, icon: Icon }: (typeof NAV)[number])
   );
 }
 
-export function SideNav() {
+/** `allowed`: hrefs que o usuário pode ver (calculado no servidor pelas permissões). */
+export function SideNav({ allowed }: { allowed: string[] }) {
   return (
     <nav className="space-y-1">
-      {NAV.map((item) => (
+      {NAV.filter((i) => allowed.includes(i.href)).map((item) => (
         <SideNavLink key={item.href} {...item} />
       ))}
     </nav>
   );
 }
 
-export function MobileNav() {
+export function MobileNav({ allowed }: { allowed: string[] }) {
   return (
     <nav className="flex gap-1 overflow-x-auto">
-      {NAV.map((item) => (
+      {NAV.filter((i) => allowed.includes(i.href)).map((item) => (
         <MobileNavLink key={item.href} {...item} />
       ))}
     </nav>

@@ -1,5 +1,5 @@
-import { History, Layers, Lock, Plus, Save, Settings, ShieldCheck, Tag, Trash2, UserPlus, UserRound, Users, X, Zap } from "lucide-react";
-import { getTenantContext } from "@/server/context";
+import { History, Layers, Lock, Plus, Save, Settings, Tag, Trash2, X, Zap } from "lucide-react";
+import { can, getTenantContext } from "@/server/context";
 import { listStages } from "@/server/data/stages";
 import { listTags } from "@/server/data/tags";
 import { listMembers } from "@/server/data/members";
@@ -16,9 +16,6 @@ import {
   deleteQuickReplyAction,
   deleteStageAction,
   deleteTagAction,
-  inviteMemberAction,
-  removeMemberAction,
-  updateMemberRoleAction,
   updateStageAction,
 } from "../actions";
 import { StageOrder } from "./stage-order";
@@ -44,24 +41,26 @@ const colorInput = "h-10 w-10 shrink-0 cursor-pointer rounded-xl border border-l
 
 export default async function ConfiguracoesPage() {
   const ctx = await getTenantContext();
-  const isAdmin = ctx.role === "admin";
+  // "isAdmin" aqui = pode gerenciar funil, tags e mensagens rápidas
+  const isAdmin = can(ctx, "configuracoes.gerenciar");
+  const canAudit = can(ctx, "auditoria.ver");
   const [stages, tags, members, logs, quickReplies] = await Promise.all([
     listStages(ctx),
     listTags(ctx),
     listMembers(ctx),
-    isAdmin ? listAuditLogs(ctx, 50) : Promise.resolve([]),
-    listQuickReplies(ctx),
+    canAudit ? listAuditLogs(ctx, 50) : Promise.resolve([]),
+    can(ctx, "whatsapp.ver") ? listQuickReplies(ctx) : Promise.resolve([]),
   ]);
   const memberName = new Map(members.map((m) => [m.user_id, m.display_name ?? "Usuário"]));
 
   return (
     <div className="space-y-8">
-      <PageHeader icon={Settings} title="Configurações" subtitle={`Funil, tags, equipe e auditoria de ${ctx.tenantName}`} />
+      <PageHeader icon={Settings} title="Configurações" subtitle={`Funil, tags, mensagens rápidas e auditoria de ${ctx.tenantName}`} />
 
       <section className="card">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="section-title"><Layers className="h-4 w-4 text-accent" /> Etapas do funil</h2>
-          {!isAdmin && <span className="chip"><Lock className="h-3 w-3" /> Somente administradores editam</span>}
+          {!isAdmin && <span className="chip"><Lock className="h-3 w-3" /> Somente quem gerencia configurações edita</span>}
         </div>
         <ul className="mt-5 space-y-2">
           {stages.map((s) => (
@@ -104,18 +103,22 @@ export default async function ConfiguracoesPage() {
           {tags.map((t) => (
             <li key={t.id} className="flex items-center gap-0.5">
               <TagBadge {...t} />
-              <form action={deleteTagAction}>
-                <input type="hidden" name="id" value={t.id} />
-                <button className="icon-btn h-6 w-6 hover:text-danger" title="Excluir tag" aria-label={`Excluir tag ${t.name}`}><X className="h-3 w-3" /></button>
-              </form>
+              {isAdmin && (
+                <form action={deleteTagAction}>
+                  <input type="hidden" name="id" value={t.id} />
+                  <button className="icon-btn h-6 w-6 hover:text-danger" title="Excluir tag" aria-label={`Excluir tag ${t.name}`}><X className="h-3 w-3" /></button>
+                </form>
+              )}
             </li>
           ))}
           {tags.length === 0 && <li className="text-sm text-subtle">Nenhuma tag criada.</li>}
         </ul>
-        <ActionForm action={createTagAction} resetOnSuccess className="mt-4 flex flex-wrap items-center gap-2" submitLabel="Criar tag" submitIcon={<Plus className="h-4 w-4" />}>
-          <input type="color" name="color" defaultValue="#a100ff" className={colorInput} aria-label="Cor da tag" />
-          <input name="name" required placeholder="Nome da tag" className="input max-w-xs" />
-        </ActionForm>
+        {isAdmin && (
+          <ActionForm action={createTagAction} resetOnSuccess className="mt-4 flex flex-wrap items-center gap-2" submitLabel="Criar tag" submitIcon={<Plus className="h-4 w-4" />}>
+            <input type="color" name="color" defaultValue="#a100ff" className={colorInput} aria-label="Cor da tag" />
+            <input name="name" required placeholder="Nome da tag" className="input max-w-xs" />
+          </ActionForm>
+        )}
       </section>
 
       <section className="card">
@@ -129,72 +132,26 @@ export default async function ConfiguracoesPage() {
                 <span className="block font-medium">{q.title}</span>
                 <span className="block whitespace-pre-wrap text-xs text-muted">{q.body}</span>
               </span>
-              <form action={deleteQuickReplyAction}>
-                <input type="hidden" name="id" value={q.id} />
-                <button className="icon-btn hover:text-danger" title="Excluir" aria-label={`Excluir /${q.shortcut}`}><Trash2 className="h-4 w-4" /></button>
-              </form>
+              {isAdmin && (
+                <form action={deleteQuickReplyAction}>
+                  <input type="hidden" name="id" value={q.id} />
+                  <button className="icon-btn hover:text-danger" title="Excluir" aria-label={`Excluir /${q.shortcut}`}><Trash2 className="h-4 w-4" /></button>
+                </form>
+              )}
             </li>
           ))}
           {quickReplies.length === 0 && <li className="py-3 text-sm text-subtle">Nenhuma mensagem rápida ainda.</li>}
         </ul>
-        <ActionForm action={createQuickReplyAction} resetOnSuccess className="mt-4 grid gap-2 md:grid-cols-[10rem_1fr]" submitLabel="Criar mensagem rápida" submitIcon={<Plus className="h-4 w-4" />} submitClassName="btn-primary md:col-start-2 md:justify-self-start">
-          <input name="shortcut" required placeholder="/atalho" className="input font-mono" aria-label="Atalho" />
-          <input name="title" required placeholder="Título (ex.: Boas-vindas)" className="input" aria-label="Título" />
-          <textarea name="body" required rows={3} placeholder="Texto da mensagem" className="input md:col-span-2" aria-label="Texto" />
-        </ActionForm>
-      </section>
-
-      <section className="card">
-        <h2 className="section-title"><Users className="h-4 w-4 text-accent" /> Equipe</h2>
-        <ul className="mt-4 divide-y divide-line">
-          {members.map((m) => (
-            <li key={m.id} className="flex flex-wrap items-center gap-3 py-3 text-sm">
-              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-accent-soft text-accent-strong text-xs font-semibold">
-                {(m.display_name ?? "U").slice(0, 1).toUpperCase()}
-              </span>
-              <span className="flex-1">
-                <span className="block font-medium">{m.display_name ?? "Usuário"}{m.user_id === ctx.userId && <span className="text-muted"> (você)</span>}</span>
-                <span className="flex items-center gap-1 text-xs text-muted">
-                  {m.role === "admin" ? <ShieldCheck className="h-3 w-3 text-accent" /> : <UserRound className="h-3 w-3" />}
-                  {m.role === "admin" ? "Administrador" : "Atendente"}
-                </span>
-              </span>
-              {isAdmin && (
-                <>
-                  <ActionForm action={updateMemberRoleAction} className="flex items-center gap-2" submitLabel="Alterar" submitClassName="btn-secondary btn-sm">
-                    <input type="hidden" name="id" value={m.id} />
-                    <select name="role" defaultValue={m.role} className="input w-40 py-1.5" aria-label="Papel">
-                      <option value="admin">Administrador</option>
-                      <option value="atendente">Atendente</option>
-                    </select>
-                  </ActionForm>
-                  {m.user_id !== ctx.userId && (
-                    <ActionForm action={removeMemberAction} submitLabel="Remover" submitIcon={<Trash2 className="h-3.5 w-3.5" />} submitClassName="btn-danger btn-sm">
-                      <input type="hidden" name="id" value={m.id} />
-                    </ActionForm>
-                  )}
-                </>
-              )}
-            </li>
-          ))}
-        </ul>
         {isAdmin && (
-          <div className="mt-4 rounded-xl border border-dashed border-line p-4">
-            <p className="flex items-center gap-2 text-sm font-medium"><UserPlus className="h-4 w-4 text-accent" /> Adicionar pessoa</p>
-            <ActionForm action={inviteMemberAction} resetOnSuccess className="mt-3 grid gap-2 md:grid-cols-5" submitLabel="Criar usuário" submitIcon={<UserPlus className="h-4 w-4" />}>
-              <input name="display_name" required placeholder="Nome" className="input" aria-label="Nome" />
-              <input name="email" type="email" required placeholder="E-mail" className="input" aria-label="E-mail" />
-              <input name="password" type="password" required minLength={10} placeholder="Senha inicial (10+)" className="input" aria-label="Senha inicial" />
-              <select name="role" defaultValue="atendente" className="input" aria-label="Papel">
-                <option value="atendente">Atendente</option>
-                <option value="admin">Administrador</option>
-              </select>
-            </ActionForm>
-          </div>
+          <ActionForm action={createQuickReplyAction} resetOnSuccess className="mt-4 grid gap-2 md:grid-cols-[10rem_1fr]" submitLabel="Criar mensagem rápida" submitIcon={<Plus className="h-4 w-4" />} submitClassName="btn-primary md:col-start-2 md:justify-self-start">
+            <input name="shortcut" required placeholder="/atalho" className="input font-mono" aria-label="Atalho" />
+            <input name="title" required placeholder="Título (ex.: Boas-vindas)" className="input" aria-label="Título" />
+            <textarea name="body" required rows={3} placeholder="Texto da mensagem" className="input md:col-span-2" aria-label="Texto" />
+          </ActionForm>
         )}
       </section>
 
-      {isAdmin && (
+      {canAudit && (
         <section className="card">
           <h2 className="section-title"><History className="h-4 w-4 text-accent" /> Auditoria <span className="text-xs font-normal text-subtle">últimas 50 alterações</span></h2>
           <ul className="mt-4 space-y-1 text-sm">
