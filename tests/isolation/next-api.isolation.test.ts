@@ -287,4 +287,23 @@ describe.skipIf(!enabled)("isolamento via API do app (Next.js)", () => {
     expect(created.status).toBe(201);
     expect(created.body.department_id).toBe(A.departmentId);
   });
+
+  it("painel da CONNECTA: admin de um cliente não lista nem cria clientes", async () => {
+    const list = await api(A, "/api/plataforma/clientes");
+    expect(list.status).toBe(403);
+    expect(JSON.stringify(list.body)).not.toContain(B.tenantId);
+    const slug = `invasor-${run}`;
+    const email = `invasor-${run}@teste.connecta.local`;
+    const r = await api(A, "/api/plataforma/clientes", {
+      method: "POST",
+      body: JSON.stringify({ name: "Invasor", slug, admin_email: email, admin_password: `Senha-${randomUUID()}`, admin_name: "X" }),
+    });
+    expect(r.status).toBe(403);
+    const t = await admin.from("tenants").select("id").eq("slug", slug);
+    expect(t.data).toEqual([]);
+    const { data } = await admin.auth.admin.listUsers({ perPage: 1000 });
+    expect(data.users.some((u) => u.email === email)).toBe(false);
+    // sem login: 401
+    expect((await fetch(`${APP}/api/plataforma/clientes`)).status).toBe(401);
+  });
 });
