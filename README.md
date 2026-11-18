@@ -97,9 +97,10 @@ SUPABASE_URL=... SUPABASE_ANON_KEY=... SUPABASE_SERVICE_ROLE_KEY=... APP_URL=htt
    do tenant** (se não existir, o contato é criado). Mensagens enviadas pelo
    painel entram na fila do tenant e o worker envia.
 
-Deploy do worker: é um processo de longa duração (não serverless). Use
-`worker/Dockerfile` em uma VM/container com 1 réplica e as variáveis
-`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` e `WHATSAPP_CREDENTIALS_KEY`.
+## Colocar no ar
+
+Guia completo para VPS Hostinger + Supabase: [docs/DEPLOY-HOSTINGER.md](./docs/DEPLOY-HOSTINGER.md).
+Resumo: `git clone` na VPS e `bash deploy/instalar.sh` (sobe app + worker + HTTPS com Docker).
 
 > Aviso: a integração usa o protocolo do WhatsApp Web (biblioteca não
 > oficial). Para alto volume, avalie a API oficial do WhatsApp Business.
