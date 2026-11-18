@@ -4,6 +4,8 @@ import { getTenantContext } from "@/server/context";
 import { HttpError } from "@/server/errors";
 import { MobileNav, SideNav } from "@/components/nav-link";
 import { LogoMark, Wordmark } from "@/components/logo";
+import { ThemeToggle } from "@/components/theme-toggle";
+import { currentTheme } from "@/lib/theme";
 
 function initials(name: string | null) {
   if (!name) return "U";
@@ -40,6 +42,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
   }
 
   const isAdmin = ctx.role === "admin";
+  const theme = await currentTheme();
 
   return (
     <div className="flex min-h-screen">
@@ -48,12 +51,12 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
           <LogoMark size={40} />
           <div className="leading-tight">
             <Wordmark className="text-sm" />
-            <p className="text-[10px] font-medium uppercase tracking-[0.3em] text-brand-600">CRM</p>
+            <p className="text-[10px] font-medium uppercase tracking-[0.3em] text-accent">CRM</p>
           </div>
         </div>
 
         <div className="mt-6 flex items-center gap-2 rounded-xl border border-line bg-surface-2/70 px-3 py-2.5">
-          <Building2 className="h-4 w-4 shrink-0 text-brand-600" />
+          <Building2 className="h-4 w-4 shrink-0 text-accent" />
           <span className="truncate text-sm font-medium" title={ctx.tenantName}>
             {ctx.tenantName}
           </span>
@@ -64,7 +67,10 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
           <SideNav />
         </div>
 
-        <div className="mt-auto rounded-2xl border border-line bg-surface-2/60 p-3">
+        <div className="mt-auto flex justify-center pb-3">
+          <ThemeToggle initial={theme} />
+        </div>
+        <div className="rounded-2xl border border-line bg-surface-2/60 p-3">
           <div className="flex items-center gap-3">
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-brand-400 to-brand-700 text-xs font-semibold text-white">
               {initials(ctx.displayName)}
@@ -72,7 +78,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-medium">{ctx.displayName ?? "Usuário"}</p>
               <p className="flex items-center gap-1 text-xs text-muted">
-                {isAdmin ? <ShieldCheck className="h-3 w-3 text-brand-600" /> : <UserRound className="h-3 w-3" />}
+                {isAdmin ? <ShieldCheck className="h-3 w-3 text-accent" /> : <UserRound className="h-3 w-3" />}
                 {isAdmin ? "Administrador" : "Atendente"}
               </p>
             </div>
@@ -92,11 +98,14 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
               <LogoMark size={34} />
               <span className="truncate text-sm font-semibold">{ctx.tenantName}</span>
             </div>
+            <div className="flex items-center gap-1">
+            <ThemeToggle initial={theme} compact />
             <form action="/auth/signout" method="post">
               <button className="icon-btn" aria-label="Sair">
                 <LogOut className="h-4 w-4" />
               </button>
             </form>
+            </div>
           </div>
           <MobileNav />
         </header>

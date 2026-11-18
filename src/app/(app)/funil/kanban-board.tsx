@@ -102,7 +102,7 @@ export function KanbanBoard({ stages, contacts }: { stages: Stage[]; contacts: C
                     className={`group cursor-grab rounded-xl border border-line bg-surface p-3 shadow-sm transition hover:border-brand-500/40 hover:shadow-md active:cursor-grabbing ${dragging === c.id ? "opacity-40" : ""}`}
                   >
                     <div className="flex items-start justify-between gap-2">
-                      <Link href={`/contatos/${c.id}`} className="text-sm font-medium text-fg hover:text-brand-700">
+                      <Link href={`/contatos/${c.id}`} className="text-sm font-medium text-fg hover:text-accent-strong">
                         {c.name}
                       </Link>
                       <GripVertical className="h-4 w-4 shrink-0 text-subtle opacity-0 transition group-hover:opacity-100" />
@@ -119,7 +119,7 @@ export function KanbanBoard({ stages, contacts }: { stages: Stage[]; contacts: C
                             <TagBadge key={t.id} {...t} />
                           ))}
                         </div>
-                        {c.value_cents > 0 && <span className="text-xs font-medium tabular-nums text-brand-700">{brl(c.value_cents)}</span>}
+                        {c.value_cents > 0 && <span className="text-xs font-medium tabular-nums text-accent-strong">{brl(c.value_cents)}</span>}
                       </div>
                     )}
                   </li>

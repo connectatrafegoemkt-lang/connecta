@@ -59,9 +59,9 @@ export function ChatThread({
         })}
         {pending.map((p) => (
           <div key={p.id} className="flex justify-end">
-            <div className="max-w-[75%] rounded-2xl rounded-br-md border border-brand-500/40 bg-brand-50 px-4 py-2.5 text-sm text-brand-900">
+            <div className="max-w-[75%] rounded-2xl rounded-br-md border border-brand-500/40 bg-accent-soft px-4 py-2.5 text-sm text-fg">
               <p className="whitespace-pre-wrap break-words">{p.body}</p>
-              <p className="mt-1 flex items-center justify-end gap-1 text-[10px] text-brand-700">
+              <p className="mt-1 flex items-center justify-end gap-1 text-[10px] text-accent-strong">
                 {p.status === "erro" ? (
                   <><TriangleAlert className="h-3 w-3 text-danger" /> Falhou: {p.error ?? ""}</>
                 ) : (

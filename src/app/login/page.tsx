@@ -1,5 +1,7 @@
 import { MessageCircle, ShieldCheck, SquareKanban } from "lucide-react";
 import { LogoArt, LogoMark, Wordmark } from "@/components/logo";
+import { ThemeToggle } from "@/components/theme-toggle";
+import { currentTheme } from "@/lib/theme";
 import { LoginForm } from "./login-form";
 
 export const metadata = { title: "Entrar" };
@@ -10,7 +12,8 @@ const FEATURES = [
   { icon: ShieldCheck, text: "Dados da sua empresa isolados e protegidos" },
 ];
 
-export default function LoginPage() {
+export default async function LoginPage() {
+  const theme = await currentTheme();
   return (
     <main className="grid min-h-screen gap-6 p-4 lg:grid-cols-2 lg:p-6">
       {/* Painel da marca: a arte original do logo é sobre preto */}
@@ -40,7 +43,10 @@ export default function LoginPage() {
         <p className="relative text-xs text-white/40">© CONNECTA · Tráfego e Marketing</p>
       </section>
 
-      <section className="flex items-center justify-center px-2 py-10">
+      <section className="relative flex items-center justify-center px-2 py-10">
+        <div className="absolute right-0 top-0">
+          <ThemeToggle initial={theme} />
+        </div>
         <div className="w-full max-w-sm">
           <div className="mb-8 flex flex-col items-center text-center lg:hidden">
             <LogoMark size={84} />

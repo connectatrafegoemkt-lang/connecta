@@ -15,7 +15,7 @@ export function PageHeader({
     <div className="flex flex-wrap items-end justify-between gap-4">
       <div className="flex items-center gap-3">
         {Icon && (
-          <span className="flex h-11 w-11 items-center justify-center rounded-xl border border-brand-500/30 bg-brand-500/10 text-brand-600 shadow-[0_0_24px_-6px_rgb(161_0_255/0.6)]">
+          <span className="flex h-11 w-11 items-center justify-center rounded-xl border border-brand-500/30 bg-brand-500/10 text-accent shadow-[0_0_24px_-6px_rgb(161_0_255/0.6)]">
             <Icon className="h-5 w-5" />
           </span>
         )}
