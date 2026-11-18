@@ -102,16 +102,22 @@ export class TenantSession {
       }
     });
 
-    sock.ev.on("messages.upsert", async ({ messages }) => {
+    sock.ev.on("messages.upsert", async ({ messages, type }) => {
+      // "notify" = mensagem nova, em tempo real. "append" = histórico/mensagens
+      // antigas entregues ao conectar: só guardamos, sem acionar a IA nem
+      // pausar conversas (senão a IA responderia conversas antigas).
+      const live = type === "notify";
       for (const m of messages) {
         try {
           await handleIncoming(this.repo, m as unknown as IncomingMessage, {
             onStored: ({ contactId, fromMe }) => {
+              if (!live) return;
               // Mensagem enviada pelo celular por uma pessoa = humano assumiu.
               if (fromMe) void this.ai.pauseForHuman(contactId).catch(() => undefined);
               else this.ai.schedule(contactId);
             },
-            saveMedia: ({ contactId, externalId }) => this.saveIncomingMedia(m, contactId, externalId),
+            // Mídia de mensagens antigas não é baixada (evita pico de memória/CPU ao conectar).
+            saveMedia: live ? ({ contactId, externalId }) => this.saveIncomingMedia(m, contactId, externalId) : undefined,
           });
         } catch (e) {
           this.log.error({ err: e }, "falha ao registrar mensagem");

@@ -250,12 +250,12 @@ export class WorkerTenantRepo implements InboundRepo {
   async getContactAiState(contactId: string) {
     const { data, error } = await this.sb
       .from("contacts")
-      .select("id, name, ai_paused_until")
+      .select("id, name, ai_enabled, ai_paused_until")
       .eq("tenant_id", this.tenantId)
       .eq("id", contactId)
       .maybeSingle();
     if (error) throw error;
-    return data as { id: string; name: string; ai_paused_until: string | null } | null;
+    return data as { id: string; name: string; ai_enabled: boolean; ai_paused_until: string | null } | null;
   }
 
   /** Pausa a IA na conversa. `until = null` reativa; "infinity" pausa até alguém reativar. */

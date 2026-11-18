@@ -1,13 +1,19 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Bot, BotOff, Loader2 } from "lucide-react";
+import { Bot, BotOff, Loader2, PauseCircle } from "lucide-react";
 import { setContactAiAction } from "../actions";
 
-/** Liga/pausa a IA nesta conversa. */
-export function AiToggle({ contactId, active: initial }: { contactId: string; active: boolean }) {
+/**
+ * IA neste número: a IA só atende contatos em que alguém ativou aqui.
+ * "Em pausa" = ativada, mas um humano respondeu há pouco (volta sozinha).
+ */
+export function AiToggle({ contactId, active: initial, paused = false }: { contactId: string; active: boolean; paused?: boolean }) {
   const [active, setActive] = useState(initial);
+  const [isPaused, setPaused] = useState(paused);
   const [pending, start] = useTransition();
+  const Icon = pending ? Loader2 : !active ? BotOff : isPaused ? PauseCircle : Bot;
+  const label = !active ? "Ativar IA neste número" : isPaused ? "IA em pausa (você respondeu)" : "IA atendendo este número";
   return (
     <button
       type="button"
@@ -15,16 +21,19 @@ export function AiToggle({ contactId, active: initial }: { contactId: string; ac
       onClick={() =>
         start(async () => {
           const r = await setContactAiAction(contactId, !active);
-          if (r.ok) setActive(!active);
+          if (r.ok) {
+            setActive(!active);
+            setPaused(false);
+          }
         })
       }
-      title={active ? "Pausar a IA nesta conversa" : "Reativar a IA nesta conversa"}
+      title={active ? "Clique para a IA parar de atender este número" : "Clique para a IA passar a atender este número"}
       className={`btn-sm inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
         active ? "border-brand-500/40 bg-accent-soft text-accent-strong" : "border-line text-muted hover:text-fg"
       }`}
     >
-      {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : active ? <Bot className="h-3.5 w-3.5" /> : <BotOff className="h-3.5 w-3.5" />}
-      {active ? "IA ativa" : "IA pausada"}
+      <Icon className={`h-3.5 w-3.5 ${pending ? "animate-spin" : ""}`} />
+      {label}
     </button>
   );
 }

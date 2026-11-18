@@ -2,12 +2,12 @@ import { describe, expect, it, vi } from "vitest";
 import { AiResponder } from "../ai-responder";
 import { DEFAULT_AI_SETTINGS } from "../../src/shared/ai/settings";
 
-function setup(opts: { mode?: string; paused?: string | null; history?: { direction: "entrada" | "saida"; body: string }[]; handoff?: boolean } = {}) {
+function setup(opts: { mode?: string; enabled?: boolean; paused?: string | null; history?: { direction: "entrada" | "saida"; body: string }[]; handoff?: boolean } = {}) {
   const repo = {
     tenantId: "t-a",
     getAiSettingsRow: vi.fn().mockResolvedValue({ ...DEFAULT_AI_SETTINGS, mode: opts.mode ?? "automatico" }),
     getCompanyName: vi.fn().mockResolvedValue("Empresa A"),
-    getContactAiState: vi.fn().mockResolvedValue({ id: "c1", name: "Maria", ai_paused_until: opts.paused ?? null }),
+    getContactAiState: vi.fn().mockResolvedValue({ id: "c1", name: "Maria", ai_enabled: opts.enabled ?? true, ai_paused_until: opts.paused ?? null }),
     listWhatsappHistory: vi.fn().mockResolvedValue(opts.history ?? [{ direction: "entrada", body: "Oi, qual o horário?" }]),
     recordAiUsage: vi.fn().mockResolvedValue(undefined),
     insertSuggestion: vi.fn().mockResolvedValue(undefined),
@@ -80,6 +80,20 @@ describe("AiResponder (atendimento por IA de um tenant)", () => {
     expect(repo.enqueueAiMessage).toHaveBeenCalled();
     expect(repo.setContactAiPause).toHaveBeenCalledWith("c1", "infinity");
     expect(repo.createHandoffTask).toHaveBeenCalledWith("c1", "faq");
+  });
+
+  it("número sem IA ativada: não chama a IA nem envia nada", async () => {
+    const { ai, create, repo } = setup({ enabled: false });
+    await ai.run("c1");
+    expect(create).not.toHaveBeenCalled();
+    expect(repo.enqueueAiMessage).not.toHaveBeenCalled();
+    expect(repo.insertSuggestion).not.toHaveBeenCalled();
+  });
+
+  it("número sem IA ativada: humano respondendo não mexe na pausa", async () => {
+    const { ai, repo } = setup({ enabled: false });
+    await ai.pauseForHuman("c1");
+    expect(repo.setContactAiPause).not.toHaveBeenCalled();
   });
 
   it("humano respondeu: pausa pelo tempo configurado", async () => {

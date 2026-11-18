@@ -150,7 +150,8 @@ export default async function WhatsappPage({ searchParams }: PageProps<"/whatsap
                   {aiSettings.mode !== "desligado" && (
                     <AiToggle
                       contactId={contact.id}
-                      active={!isAiPaused(contact.ai_paused_until)}
+                      active={contact.ai_enabled === true}
+                      paused={contact.ai_enabled === true && isAiPaused(contact.ai_paused_until)}
                     />
                   )}
                   <Link href={`/contatos/${contact.id}`} className="btn-ghost btn-sm">

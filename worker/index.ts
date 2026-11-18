@@ -12,6 +12,10 @@ import { listSessionStates, WorkerTenantRepo } from "./repo";
 import { planSession } from "./plan";
 import { TenantSession } from "./session";
 import OpenAI from "openai";
+import { silenceSignalLogs } from "./quiet-console";
+
+// Antes de tudo: a libsignal não pode despejar chaves no console/logs.
+silenceSignalLogs();
 
 const log = pino({ level: process.env.LOG_LEVEL ?? "info" });
 const url = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
