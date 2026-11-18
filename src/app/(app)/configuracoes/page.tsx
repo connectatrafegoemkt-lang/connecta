@@ -1,16 +1,19 @@
-import { History, Layers, Lock, Plus, Save, Settings, ShieldCheck, Tag, Trash2, UserPlus, UserRound, Users, X } from "lucide-react";
+import { History, Layers, Lock, Plus, Save, Settings, ShieldCheck, Tag, Trash2, UserPlus, UserRound, Users, X, Zap } from "lucide-react";
 import { getTenantContext } from "@/server/context";
 import { listStages } from "@/server/data/stages";
 import { listTags } from "@/server/data/tags";
 import { listMembers } from "@/server/data/members";
 import { listAuditLogs } from "@/server/data/audit";
+import { listQuickReplies } from "@/server/data/whatsapp-media";
 import { ActionForm } from "@/components/action-form";
 import { TagBadge } from "@/components/tag-badge";
 import { PageHeader } from "@/components/page-header";
 import { dateTime } from "@/components/format";
 import {
   createStageAction,
+  createQuickReplyAction,
   createTagAction,
+  deleteQuickReplyAction,
   deleteStageAction,
   deleteTagAction,
   inviteMemberAction,
@@ -42,11 +45,12 @@ const colorInput = "h-10 w-10 shrink-0 cursor-pointer rounded-xl border border-l
 export default async function ConfiguracoesPage() {
   const ctx = await getTenantContext();
   const isAdmin = ctx.role === "admin";
-  const [stages, tags, members, logs] = await Promise.all([
+  const [stages, tags, members, logs, quickReplies] = await Promise.all([
     listStages(ctx),
     listTags(ctx),
     listMembers(ctx),
     isAdmin ? listAuditLogs(ctx, 50) : Promise.resolve([]),
+    listQuickReplies(ctx),
   ]);
   const memberName = new Map(members.map((m) => [m.user_id, m.display_name ?? "Usuário"]));
 
@@ -111,6 +115,32 @@ export default async function ConfiguracoesPage() {
         <ActionForm action={createTagAction} resetOnSuccess className="mt-4 flex flex-wrap items-center gap-2" submitLabel="Criar tag" submitIcon={<Plus className="h-4 w-4" />}>
           <input type="color" name="color" defaultValue="#a100ff" className={colorInput} aria-label="Cor da tag" />
           <input name="name" required placeholder="Nome da tag" className="input max-w-xs" />
+        </ActionForm>
+      </section>
+
+      <section className="card">
+        <h2 className="section-title"><Zap className="h-4 w-4 text-accent" /> Mensagens rápidas do WhatsApp</h2>
+        <p className="mt-1 text-sm text-muted">No chat, digite <kbd className="rounded border border-line bg-surface-2 px-1.5 text-xs">/</kbd> e o atalho para inserir a mensagem.</p>
+        <ul className="mt-4 divide-y divide-line">
+          {quickReplies.map((q) => (
+            <li key={q.id} className="flex items-start gap-3 py-3 text-sm">
+              <span className="chip shrink-0 font-mono text-accent-strong">/{q.shortcut}</span>
+              <span className="min-w-0 flex-1">
+                <span className="block font-medium">{q.title}</span>
+                <span className="block whitespace-pre-wrap text-xs text-muted">{q.body}</span>
+              </span>
+              <form action={deleteQuickReplyAction}>
+                <input type="hidden" name="id" value={q.id} />
+                <button className="icon-btn hover:text-danger" title="Excluir" aria-label={`Excluir /${q.shortcut}`}><Trash2 className="h-4 w-4" /></button>
+              </form>
+            </li>
+          ))}
+          {quickReplies.length === 0 && <li className="py-3 text-sm text-subtle">Nenhuma mensagem rápida ainda.</li>}
+        </ul>
+        <ActionForm action={createQuickReplyAction} resetOnSuccess className="mt-4 grid gap-2 md:grid-cols-[10rem_1fr]" submitLabel="Criar mensagem rápida" submitIcon={<Plus className="h-4 w-4" />} submitClassName="btn-primary md:col-start-2 md:justify-self-start">
+          <input name="shortcut" required placeholder="/atalho" className="input font-mono" aria-label="Atalho" />
+          <input name="title" required placeholder="Título (ex.: Boas-vindas)" className="input" aria-label="Título" />
+          <textarea name="body" required rows={3} placeholder="Texto da mensagem" className="input md:col-span-2" aria-label="Texto" />
         </ActionForm>
       </section>
 
