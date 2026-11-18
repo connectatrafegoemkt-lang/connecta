@@ -30,17 +30,18 @@ echo "$out" | grep -q "já estava atualizado" || fail "segunda execução deveri
 
 echo "== 3. banco antigo, migrations rodadas à mão (como em produção): só registra"
 fresh
-for f in supabase/migrations/*.sql; do psql "$URL" -q -v ON_ERROR_STOP=1 -f "$f" >/dev/null 2>&1; done
+for f in supabase/migrations/*.sql; do psql "$URL" -q -v ON_ERROR_STOP=1 -f "$f" >/dev/null || fail "aplicar $f"; done
 out=$(migrar); echo "$out"
 echo "$out" | grep -q "0 aplicada(s), $total registrada(s)" || fail "deveria só registrar"
-diff <(schema) /tmp/ref-migrar.sql >/dev/null || fail "esquema diferente"
+check_schema() { if ! diff <(schema) /tmp/ref-migrar.sql > /tmp/diff-migrar.txt; then head -40 /tmp/diff-migrar.txt >&2; fail "esquema diferente"; fi; }
+check_schema
 
 echo "== 4. banco antigo sem a última migration: registra as antigas e aplica a nova"
 fresh
-for f in $(ls supabase/migrations/*.sql | head -n $((total - 1))); do psql "$URL" -q -v ON_ERROR_STOP=1 -f "$f" >/dev/null 2>&1; done
+for f in $(ls supabase/migrations/*.sql | head -n $((total - 1))); do psql "$URL" -q -v ON_ERROR_STOP=1 -f "$f" >/dev/null || fail "aplicar $f"; done
 out=$(migrar); echo "$out"
 echo "$out" | grep -q "1 aplicada(s), $((total - 1)) registrada(s)" || fail "deveria aplicar só a nova"
-diff <(schema) /tmp/ref-migrar.sql >/dev/null || fail "esquema diferente"
+check_schema
 
 echo "== 5. migration com erro: nada fica pela metade"
 tmp=supabase/migrations/29991231000000_teste_erro.sql
