@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { ArrowRight, Loader2, Lock, Mail, TriangleAlert } from "lucide-react";
 import { supabaseBrowser } from "@/lib/supabase-browser";
 
 export function LoginForm() {
@@ -30,16 +31,28 @@ export function LoginForm() {
   return (
     <form onSubmit={onSubmit} className="mt-6 space-y-4">
       <label className="block">
-        <span className="text-sm font-medium text-slate-700">E-mail</span>
-        <input name="email" type="email" required autoComplete="email" className="input mt-1" />
+        <span className="label">E-mail</span>
+        <span className="relative block">
+          <Mail className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-subtle" />
+          <input name="email" type="email" required autoComplete="email" placeholder="voce@empresa.com.br" className="input pl-10" />
+        </span>
       </label>
       <label className="block">
-        <span className="text-sm font-medium text-slate-700">Senha</span>
-        <input name="password" type="password" required autoComplete="current-password" className="input mt-1" />
+        <span className="label">Senha</span>
+        <span className="relative block">
+          <Lock className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-subtle" />
+          <input name="password" type="password" required autoComplete="current-password" placeholder="••••••••••" className="input pl-10" />
+        </span>
       </label>
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && (
+        <p className="flex items-center gap-1.5 text-sm text-danger">
+          <TriangleAlert className="h-4 w-4" /> {error}
+        </p>
+      )}
       <button type="submit" disabled={loading} className="btn-primary w-full">
+        {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
         {loading ? "Entrando…" : "Entrar"}
+        {!loading && <ArrowRight className="h-4 w-4" />}
       </button>
     </form>
   );
