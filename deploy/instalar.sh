@@ -46,12 +46,12 @@ else
   echo "   .env já existe, mantendo."
 fi
 # Chave da IA (opcional): pergunta se ainda não estiver no .env
-if ! grep -qE '^ANTHROPIC_API_KEY=.+' .env; then
-  echo "   Atendimento por IA: cole a chave da Anthropic da CONNECTA (sk-ant-...)."
-  read -rsp "   ANTHROPIC_API_KEY (Enter para pular; não aparece ao digitar): " AK; echo
+if ! grep -qE '^OPENAI_API_KEY=.+' .env; then
+  echo "   Atendimento por IA (ChatGPT): cole a chave da OpenAI da CONNECTA (sk-...)."
+  read -rsp "   OPENAI_API_KEY (Enter para pular; não aparece ao digitar): " AK; echo
   if [ -n "$AK" ]; then
-    sed -i '/^ANTHROPIC_API_KEY=/d' .env
-    echo "ANTHROPIC_API_KEY=${AK}" >> .env
+    sed -i '/^OPENAI_API_KEY=/d' .env
+    echo "OPENAI_API_KEY=${AK}" >> .env
     echo "   chave da IA salva no .env"
   else
     echo "   sem chave: o atendimento por IA fica desativado (dá para adicionar depois rodando este script de novo)"

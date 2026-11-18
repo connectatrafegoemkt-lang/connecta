@@ -128,7 +128,7 @@ cd /opt/connecta && git pull && bash deploy/instalar.sh
 
 ## 8. Atendimento por IA
 
-A IA usa a chave da Anthropic **da CONNECTA** (console.anthropic.com → API Keys), que paga o uso de
+A IA usa o ChatGPT (OpenAI) com a chave **da CONNECTA** (platform.openai.com → API keys), que paga o uso de
 todos os clientes; o consumo de cada um aparece em **Atendimento IA → Uso neste mês**.
 O instalador pergunta a chave se ela ainda não estiver no `.env` (dá para pular e adicionar depois
 rodando `bash deploy/instalar.sh` de novo). Cada cliente configura a própria IA na tela
