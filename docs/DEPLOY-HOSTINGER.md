@@ -111,11 +111,34 @@ cd /opt/connecta && docker compose run --rm worker npx tsx scripts/create-tenant
   atendentes em **Configurações → Usuários**.
 - Em **WhatsApp**, o admin clica **Conectar WhatsApp** e lê o QR com o celular da empresa.
 
-## 7. Dia a dia
+## 7. Atualizar o sistema
+
+Sempre que uma novidade for mesclada na `main` do GitHub:
+
+1. **Se a atualização trouxer mudança no banco** (arquivo novo em `supabase/migrations/`), rode
+   esse arquivo no Supabase: SQL Editor → New query → colar → **Run**. A CONNECTA avisa quando
+   for o caso e manda o arquivo.
+2. Na VPS:
+
+```bash
+cd /opt/connecta && git pull && bash deploy/instalar.sh
+```
+
+3. No navegador, recarregue com **Ctrl + Shift + R**.
+
+## 8. Atendimento por IA
+
+A IA usa a chave da Anthropic **da CONNECTA** (console.anthropic.com → API Keys), que paga o uso de
+todos os clientes; o consumo de cada um aparece em **Atendimento IA → Uso neste mês**.
+O instalador pergunta a chave se ela ainda não estiver no `.env` (dá para pular e adicionar depois
+rodando `bash deploy/instalar.sh` de novo). Cada cliente configura a própria IA na tela
+**Atendimento IA** (modo, nicho, serviços, perguntas frequentes, regras, horários).
+
+## 9. Dia a dia
 
 | Tarefa | Comando (dentro de `/opt/connecta`) |
 |---|---|
-| Atualizar para a versão mais nova | `git pull && bash deploy/instalar.sh` |
+| Atualizar para a versão mais nova | veja a seção 7 |
 | Ver se está tudo rodando | `docker compose ps` |
 | Ver erros do app | `docker compose logs --tail=100 app` |
 | Ver erros do WhatsApp | `docker compose logs --tail=100 worker` |
