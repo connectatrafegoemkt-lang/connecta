@@ -1,5 +1,5 @@
 import "server-only";
-import { requireAdmin, type TenantContext } from "../context";
+import { requirePerm, type TenantContext } from "../context";
 import { badRequest, fromDbError, notFound } from "../errors";
 
 export interface Stage {
@@ -20,7 +20,7 @@ export async function listStages(ctx: TenantContext): Promise<Stage[]> {
 }
 
 export async function createStage(ctx: TenantContext, input: Partial<Stage> & { name: string }) {
-  requireAdmin(ctx);
+  requirePerm(ctx, "configuracoes.gerenciar");
   const stages = await listStages(ctx);
   const position = input.position ?? (stages.at(-1)?.position ?? -1) + 1;
   const { data, error } = await ctx.db
@@ -32,7 +32,7 @@ export async function createStage(ctx: TenantContext, input: Partial<Stage> & { 
 }
 
 export async function updateStage(ctx: TenantContext, id: string, input: Partial<Stage>) {
-  requireAdmin(ctx);
+  requirePerm(ctx, "configuracoes.gerenciar");
   const { data, error } = await ctx.db.update("pipeline_stages", input).eq("id", id).select(COLS);
   if (error) throw fromDbError(error);
   if (!data?.length) throw notFound("Etapa não encontrada");
@@ -40,7 +40,7 @@ export async function updateStage(ctx: TenantContext, id: string, input: Partial
 }
 
 export async function reorderStages(ctx: TenantContext, ids: string[]) {
-  requireAdmin(ctx);
+  requirePerm(ctx, "configuracoes.gerenciar");
   for (const [position, id] of ids.entries()) {
     const { error } = await ctx.db.update("pipeline_stages", { position }).eq("id", id);
     if (error) throw fromDbError(error);
@@ -48,7 +48,7 @@ export async function reorderStages(ctx: TenantContext, ids: string[]) {
 }
 
 export async function deleteStage(ctx: TenantContext, id: string) {
-  requireAdmin(ctx);
+  requirePerm(ctx, "configuracoes.gerenciar");
   const used = await ctx.db.select("contacts", "id", { count: "exact", head: true }).eq("stage_id", id);
   if ((used.count ?? 0) > 0) throw badRequest("Mova os contatos desta etapa antes de excluí-la");
   const { data, error } = await ctx.db.delete("pipeline_stages").eq("id", id).select("id");

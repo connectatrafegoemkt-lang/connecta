@@ -17,6 +17,8 @@ export const TENANT_TABLES = [
   "ai_suggestions",
   "ai_usage",
   "quick_replies",
+  "departments",
+  "member_departments",
   // whatsapp_auth_keys fica DE FORA de propósito: só o worker acessa.
 ] as const;
 export type TenantTable = (typeof TENANT_TABLES)[number];

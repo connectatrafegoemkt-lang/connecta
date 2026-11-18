@@ -1,5 +1,5 @@
 import "server-only";
-import type { TenantContext } from "../context";
+import { can, type TenantContext } from "../context";
 import { badRequest, fromDbError, notFound } from "../errors";
 import type { ContactCreate, ContactUpdate } from "../validation";
 
@@ -16,6 +16,7 @@ export interface Contact {
   stage_id: string | null;
   stage_position: number;
   owner_id: string | null;
+  department_id: string | null;
   last_interaction_at: string | null;
   ai_paused_until?: string | null;
   created_at: string;
@@ -24,7 +25,7 @@ export interface Contact {
 }
 
 const COLUMNS =
-  "id, tenant_id, name, email, phone, company, source, notes, value_cents, stage_id, stage_position, owner_id, last_interaction_at, ai_paused_until, created_at, updated_at";
+  "id, tenant_id, name, email, phone, company, source, notes, value_cents, stage_id, stage_position, owner_id, department_id, last_interaction_at, ai_paused_until, created_at, updated_at";
 const WITH_TAGS = `${COLUMNS}, contact_tags(tags(id, name, color))`;
 
 type RawContact = Contact & { contact_tags?: { tags: { id: string; name: string; color: string } | null }[] };
@@ -36,7 +37,7 @@ function mapTags(row: RawContact): Contact {
 
 export async function listContacts(
   ctx: TenantContext,
-  opts: { q?: string; stage_id?: string; tag_id?: string; limit?: number; offset?: number } = {},
+  opts: { q?: string; stage_id?: string; tag_id?: string; department_id?: string; limit?: number; offset?: number } = {},
 ) {
   const limit = opts.limit ?? 50;
   const offset = opts.offset ?? 0;
@@ -52,6 +53,7 @@ export async function listContacts(
   }
   if (opts.stage_id) query = query.eq("stage_id", opts.stage_id);
   if (opts.tag_id) query = query.eq("filter_tags.tag_id", opts.tag_id);
+  if (opts.department_id) query = query.eq("department_id", opts.department_id);
   const { data, error, count } = await query;
   if (error) throw fromDbError(error);
   return { items: (data as unknown as RawContact[]).map(mapTags), total: count ?? 0 };
@@ -97,6 +99,11 @@ async function assertOwnTags(ctx: TenantContext, tagIds: string[] | undefined) {
 export async function createContact(ctx: TenantContext, input: ContactCreate): Promise<Contact> {
   const { tag_ids, ...fields } = input;
   await assertOwnTags(ctx, tag_ids);
+  // Quem só enxerga os próprios setores cria o contato no seu (primeiro) setor,
+  // senão o contato ficaria "sem setor" e visível a todos.
+  if (fields.department_id === undefined && !can(ctx, "setores.todos") && ctx.departmentIds.length) {
+    fields.department_id = ctx.departmentIds[0];
+  }
   if (!fields.stage_id) {
     const first = await ctx.db.select("pipeline_stages", "id").order("position").limit(1).maybeSingle();
     if (first.data) fields.stage_id = (first.data as unknown as { id: string }).id;
