@@ -122,10 +122,10 @@ export async function createTenantFixture(label: string): Promise<TenantFixture>
       [`Contato ${label}`, `contato-${label}@exemplo.com`, `55119${Math.floor(Math.random() * 1e8)}`, stageId],
     );
     const contactId = contact.rows[0].id;
-    const tag = await q<{ id: string }>("insert into public.tags (name) values ($1) returning id", [
-      `tag-${label}`,
-    ]);
-    const tagId = tag.rows[0].id;
+    // etiquetas são configuração (perfil admin/gerente); o atendente só as aplica
+    const tagId = await as({ userId: adminId }, (qa) =>
+      qa<{ id: string }>("insert into public.tags (name) values ($1) returning id", [`tag-${label}`]),
+    ).then((r) => r.rows[0].id);
     await q("insert into public.contact_tags (contact_id, tag_id) values ($1, $2)", [contactId, tagId]);
     const inter = await q<{ id: string }>(
       "insert into public.interactions (contact_id, type, body) values ($1, 'nota', $2) returning id",

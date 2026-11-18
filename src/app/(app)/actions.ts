@@ -12,6 +12,7 @@ import {
   interactionCreateSchema,
   memberInviteSchema,
   memberUpdateSchema,
+  departmentSchema,
   stageCreateSchema,
   stageReorderSchema,
   stageUpdateSchema,
@@ -27,6 +28,7 @@ import { createTask, deleteTask, updateTask } from "@/server/data/tasks";
 import { createStage, deleteStage, reorderStages, updateStage } from "@/server/data/stages";
 import { createTag, deleteTag } from "@/server/data/tags";
 import { inviteMember, removeMember, updateMember } from "@/server/data/members";
+import { createDepartment, deleteDepartment } from "@/server/data/departments";
 import { queueWhatsappMessage, requestWhatsapp } from "@/server/data/whatsapp";
 import { cancelScheduled, createQuickReply, deleteQuickReply, queueTextMessage } from "@/server/data/whatsapp-media";
 import { saveAiSettings, setContactAi, setSuggestionStatus, testAiReply } from "@/server/data/ai";
@@ -38,13 +40,14 @@ import { saveAiSettings, setContactAi, setSuggestionStatus, testAiReply } from "
  *   estritos — tenant_id enviado no formulário é simplesmente ignorado.
  */
 
-const CONTACT_FIELDS = ["name", "email", "phone", "company", "source", "notes", "stage_id", "tag_ids[]"];
+const CONTACT_FIELDS = ["name", "email", "phone", "company", "source", "notes", "stage_id", "department_id", "tag_ids[]"];
 
 function contactInput(fd: FormData) {
   const raw = pick(fd, CONTACT_FIELDS);
   const cents = reaisToCents(fd.get("value"));
   if (cents !== undefined) raw.value_cents = cents;
   if (raw.stage_id === "") raw.stage_id = null;
+  if (raw.department_id === "") raw.department_id = null;
   return raw;
 }
 
@@ -219,23 +222,25 @@ export async function deleteTagAction(fd: FormData) {
   revalidatePath("/configuracoes");
 }
 
+const MEMBER_FIELDS = ["display_name", "profile", "permissions[]", "department_ids[]"];
+
 export async function inviteMemberAction(_: ActionState, fd: FormData): Promise<ActionState> {
   try {
     const ctx = await getTenantContext();
-    await inviteMember(ctx, parseOrThrow(memberInviteSchema, pick(fd, ["email", "password", "display_name", "role"])));
-    revalidatePath("/configuracoes");
+    await inviteMember(ctx, parseOrThrow(memberInviteSchema, pick(fd, ["email", "password", ...MEMBER_FIELDS])));
+    revalidatePath("/equipe");
     return { ok: true, message: "Usuário criado." };
   } catch (e) {
     return toActionError(e);
   }
 }
 
-export async function updateMemberRoleAction(_: ActionState, fd: FormData): Promise<ActionState> {
+export async function updateMemberAction(_: ActionState, fd: FormData): Promise<ActionState> {
   try {
     const ctx = await getTenantContext();
-    await updateMember(ctx, parseOrThrow(idSchema, fd.get("id")), parseOrThrow(memberUpdateSchema, pick(fd, ["role"])));
-    revalidatePath("/configuracoes");
-    return { ok: true };
+    await updateMember(ctx, parseOrThrow(idSchema, fd.get("id")), parseOrThrow(memberUpdateSchema, pick(fd, MEMBER_FIELDS)));
+    revalidatePath("/equipe");
+    return { ok: true, message: "Acessos salvos." };
   } catch (e) {
     return toActionError(e);
   }
@@ -245,7 +250,32 @@ export async function removeMemberAction(_: ActionState, fd: FormData): Promise<
   try {
     const ctx = await getTenantContext();
     await removeMember(ctx, parseOrThrow(idSchema, fd.get("id")));
-    revalidatePath("/configuracoes");
+    revalidatePath("/equipe");
+    return { ok: true };
+  } catch (e) {
+    return toActionError(e);
+  }
+}
+
+// ---------------------------------------------------------------- Setores
+
+export async function createDepartmentAction(_: ActionState, fd: FormData): Promise<ActionState> {
+  try {
+    const ctx = await getTenantContext();
+    await createDepartment(ctx, parseOrThrow(departmentSchema, pick(fd, ["name", "color"])));
+    revalidatePath("/equipe");
+    return { ok: true, message: "Setor criado." };
+  } catch (e) {
+    return toActionError(e);
+  }
+}
+
+export async function deleteDepartmentAction(_: ActionState, fd: FormData): Promise<ActionState> {
+  try {
+    const ctx = await getTenantContext();
+    await deleteDepartment(ctx, parseOrThrow(idSchema, fd.get("id")));
+    revalidatePath("/equipe");
+    revalidatePath("/contatos");
     return { ok: true };
   } catch (e) {
     return toActionError(e);

@@ -1,5 +1,5 @@
 import "server-only";
-import { requireAdmin, type TenantContext } from "../context";
+import { can, requirePerm, type TenantContext } from "../context";
 import { badRequest, fromDbError, notFound } from "../errors";
 import { signedUrlsFor } from "./whatsapp-media";
 
@@ -31,14 +31,14 @@ export async function getWhatsappSession(ctx: TenantContext): Promise<WhatsappSe
 
 /** QR atual — somente admin (o RLS também garante isso). */
 export async function getWhatsappQr(ctx: TenantContext): Promise<string | null> {
-  if (ctx.role !== "admin") return null;
+  if (!can(ctx, "whatsapp.conectar")) return null;
   const { data, error } = await ctx.db.select("whatsapp_qr", "qr").maybeSingle();
   if (error) throw fromDbError(error);
   return (data as { qr: string | null } | null)?.qr ?? null;
 }
 
 export async function requestWhatsapp(ctx: TenantContext, action: "conectar" | "desconectar") {
-  requireAdmin(ctx);
+  requirePerm(ctx, "whatsapp.conectar");
   const { error } = await ctx.db.rpc("whatsapp_request", { p_action: action });
   if (error) throw fromDbError(error);
 }

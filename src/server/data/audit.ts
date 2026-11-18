@@ -1,5 +1,5 @@
 import "server-only";
-import { requireAdmin, type TenantContext } from "../context";
+import { requirePerm, type TenantContext } from "../context";
 import { fromDbError } from "../errors";
 
 export interface AuditLog {
@@ -12,7 +12,7 @@ export interface AuditLog {
 }
 
 export async function listAuditLogs(ctx: TenantContext, limit = 100): Promise<AuditLog[]> {
-  requireAdmin(ctx);
+  requirePerm(ctx, "auditoria.ver");
   const { data, error } = await ctx.db
     .select("audit_logs", "id, user_id, action, table_name, record_id, created_at")
     .order("created_at", { ascending: false })

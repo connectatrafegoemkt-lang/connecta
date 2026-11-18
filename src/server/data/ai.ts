@@ -1,6 +1,6 @@
 import "server-only";
 import OpenAI from "openai";
-import { requireAdmin, type TenantContext } from "../context";
+import { requirePerm, type TenantContext } from "../context";
 import { badRequest, fromDbError, HttpError, notFound } from "../errors";
 import { generateReply } from "@/shared/ai/agent";
 import { aiSettingsSchema, settingsFromRow, type AiSettings } from "@/shared/ai/settings";
@@ -14,7 +14,7 @@ export async function getAiSettings(ctx: TenantContext): Promise<AiSettings> {
 }
 
 export async function saveAiSettings(ctx: TenantContext, input: unknown): Promise<AiSettings> {
-  requireAdmin(ctx);
+  requirePerm(ctx, "ia.configurar");
   const parsed = aiSettingsSchema.safeParse(input);
   if (!parsed.success) throw badRequest("Configuração inválida");
   const exists = await ctx.db.select("ai_settings", "tenant_id").maybeSingle();
@@ -28,7 +28,7 @@ export async function saveAiSettings(ctx: TenantContext, input: unknown): Promis
 }
 
 export async function aiUsageSummary(ctx: TenantContext) {
-  requireAdmin(ctx);
+  requirePerm(ctx, "ia.configurar");
   const { data, error } = await ctx.db.rpc("ai_usage_summary");
   if (error) throw fromDbError(error);
   return data as { mensagens: number; testes: number; input_tokens: number; output_tokens: number };
@@ -71,7 +71,7 @@ function openai() {
 
 /** Simula o atendimento com a configuração (salva ou em edição) — só admin. */
 export async function testAiReply(ctx: TenantContext, settingsInput: unknown, history: HistoryItem[]) {
-  requireAdmin(ctx);
+  requirePerm(ctx, "ia.configurar");
   const parsed = aiSettingsSchema.safeParse(settingsInput);
   if (!parsed.success) throw badRequest("Configuração inválida");
   const reply = await generateReply({

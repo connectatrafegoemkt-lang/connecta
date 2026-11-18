@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { PERMISSION_KEYS, type Permission } from "@/shared/permissions";
 
 /**
  * Schemas de entrada das APIs/Server Actions.
@@ -31,6 +32,7 @@ export const contactCreateSchema = z.strictObject({
   value_cents: z.coerce.number().int().min(0).max(1e13).optional(),
   stage_id: uuid.nullable().optional(),
   owner_id: uuid.nullable().optional(),
+  department_id: uuid.nullable().optional(),
   tag_ids: z.array(uuid).max(50).optional(),
 });
 export const contactUpdateSchema = contactCreateSchema.partial();
@@ -46,6 +48,7 @@ export const contactListQuerySchema = z.strictObject({
   q: z.string().trim().max(100).optional(),
   stage_id: uuid.optional(),
   tag_id: uuid.optional(),
+  department_id: uuid.optional(),
   limit: z.coerce.number().int().min(1).max(200).default(50),
   offset: z.coerce.number().int().min(0).default(0),
 });
@@ -90,15 +93,29 @@ export const taskListQuerySchema = z.strictObject({
   contact_id: uuid.optional(),
 });
 
+const profileEnum = z.enum(["admin", "gerente", "atendente", "leitura"]);
+const permissionList = z.array(z.enum(PERMISSION_KEYS as [Permission, ...Permission[]])).max(PERMISSION_KEYS.length);
+const departmentIds = z.array(uuid).max(50);
+
 export const memberInviteSchema = z.strictObject({
   email: z.email(),
   password: z.string().min(10).max(200),
   display_name: z.string().trim().min(1).max(100),
-  role: z.enum(["admin", "atendente"]),
+  profile: profileEnum,
+  /** Ajuste fino; se ausente, usa as permissões padrão do perfil. */
+  permissions: permissionList.optional(),
+  department_ids: departmentIds.optional(),
 });
 export const memberUpdateSchema = z.strictObject({
-  role: z.enum(["admin", "atendente"]).optional(),
+  profile: profileEnum.optional(),
+  permissions: permissionList.optional(),
+  department_ids: departmentIds.optional(),
   display_name: z.string().trim().min(1).max(100).optional(),
+});
+
+export const departmentSchema = z.strictObject({
+  name: z.string().trim().min(1).max(60),
+  color: hex.optional(),
 });
 
 export const idSchema = uuid;

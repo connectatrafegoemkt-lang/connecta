@@ -5,6 +5,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { bearerFrom, createUserClient } from "./supabase/user-client";
 import { TenantDb } from "./data/tenant-db";
 import { forbidden, unauthorized } from "./errors";
+import type { Permission, Profile } from "@/shared/permissions";
 
 export type TenantRole = "admin" | "atendente";
 
@@ -13,6 +14,9 @@ export interface TenantContext {
   tenantId: string;
   tenantName: string;
   role: TenantRole;
+  profile: Profile;
+  permissions: ReadonlySet<Permission>;
+  departmentIds: string[];
   displayName: string | null;
   db: TenantDb;
   /** Cliente do usuário (RLS). Use `db` sempre que possível. */
@@ -42,12 +46,20 @@ export const getTenantContext = cache(async (): Promise<TenantContext> => {
     tenantId: row.tenant_id,
     tenantName: row.tenant_name,
     role: row.role,
+    profile: (row.profile ?? (row.role === "admin" ? "admin" : "atendente")) as Profile,
+    permissions: new Set((row.permissions ?? []) as Permission[]),
+    departmentIds: (row.department_ids ?? []) as string[],
     displayName: row.display_name,
     db: new TenantDb(supabase, row.tenant_id),
     supabase,
   };
 });
 
-export function requireAdmin(ctx: TenantContext) {
-  if (ctx.role !== "admin") throw forbidden("Apenas administradores");
+/** O usuário da sessão tem esta permissão? (admin tem todas) */
+export function can(ctx: Pick<TenantContext, "role" | "permissions">, p: Permission): boolean {
+  return ctx.role === "admin" || ctx.permissions.has(p);
+}
+
+export function requirePerm(ctx: TenantContext, p: Permission) {
+  if (!can(ctx, p)) throw forbidden("Você não tem permissão para esta ação");
 }

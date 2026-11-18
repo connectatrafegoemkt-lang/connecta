@@ -16,7 +16,10 @@ login e acesso **somente** aos próprios dados.
 - Histórico de interações (nota, ligação, e-mail, reunião, WhatsApp) em tempo real
 - Tarefas e lembretes
 - Dashboard
-- Usuários por tenant com papéis **admin** e **atendente**
+- Equipe por tenant com **setores** (ex.: Comercial, Trabalhista) e **perfis**
+  (Administrador, Gerente, Atendente, Só leitura) + ajuste fino de permissões
+  por pessoa. Quem não tem "ver todos os setores" só enxerga os contatos e
+  conversas dos seus setores (e os sem setor) — regra aplicada no banco (RLS)
 - Log de auditoria
 - WhatsApp por QR code: uma sessão por tenant, mensagens recebidas viram
   interações no contato certo, envio e recebimento em tempo real

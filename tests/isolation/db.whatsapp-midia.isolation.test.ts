@@ -12,9 +12,11 @@ beforeAll(async () => {
   A = await createTenantFixture("md-a");
   B = await createTenantFixture("md-b");
   for (const [t, phone] of [[A, "5511940000001"], [B, "5511940000002"]] as const) {
+    await as({ userId: t.adminId }, (q) =>
+      q("insert into public.quick_replies (shortcut, title, body) values ('boasvindas', 'Boas-vindas', $1)", [`rapida-${t.tenantId}`]),
+    );
     await as({ userId: t.atendenteId }, async (q) => {
       await q("update public.contacts set phone = $1 where id = $2", [phone, t.contactId]);
-      await q("insert into public.quick_replies (shortcut, title, body) values ('boasvindas', 'Boas-vindas', $1)", [`rapida-${t.tenantId}`]);
       await q("insert into public.whatsapp_outbox (contact_id, body, scheduled_at) values ($1, $2, $3)", [t.contactId, `agendada-${t.tenantId}`, future()]);
     });
   }

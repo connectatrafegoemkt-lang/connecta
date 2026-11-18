@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { Building2, LogOut, ShieldCheck, UserRound } from "lucide-react";
-import { getTenantContext } from "@/server/context";
+import { can, getTenantContext } from "@/server/context";
+import { profileLabel } from "@/shared/permissions";
 import { HttpError } from "@/server/errors";
 import { MobileNav, SideNav } from "@/components/nav-link";
 import { LogoMark, Wordmark } from "@/components/logo";
@@ -42,6 +43,16 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
   }
 
   const isAdmin = ctx.role === "admin";
+  const seesContacts = can(ctx, "contatos.ver");
+  const allowed = [
+    "/dashboard",
+    ...(seesContacts ? ["/contatos", "/funil"] : []),
+    "/tarefas",
+    ...(can(ctx, "whatsapp.ver") ? ["/whatsapp"] : []),
+    ...(can(ctx, "ia.configurar") ? ["/atendimento-ia"] : []),
+    ...(can(ctx, "equipe.gerenciar") ? ["/equipe"] : []),
+    "/configuracoes",
+  ];
   const theme = await currentTheme();
 
   return (
@@ -64,7 +75,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
 
         <div className="mt-6">
           <p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-subtle">Menu</p>
-          <SideNav />
+          <SideNav allowed={allowed} />
         </div>
 
         <div className="mt-auto flex justify-center pb-3">
@@ -79,7 +90,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
               <p className="truncate text-sm font-medium">{ctx.displayName ?? "Usuário"}</p>
               <p className="flex items-center gap-1 text-xs text-muted">
                 {isAdmin ? <ShieldCheck className="h-3 w-3 text-accent" /> : <UserRound className="h-3 w-3" />}
-                {isAdmin ? "Administrador" : "Atendente"}
+                {profileLabel(ctx.profile)}
               </p>
             </div>
             <form action="/auth/signout" method="post">
@@ -107,7 +118,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
             </form>
             </div>
           </div>
-          <MobileNav />
+          <MobileNav allowed={allowed} />
         </header>
         <main className="mx-auto w-full max-w-7xl flex-1 p-4 md:p-8">{children}</main>
       </div>

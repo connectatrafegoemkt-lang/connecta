@@ -1,4 +1,5 @@
-import { getTenantContext } from "@/server/context";
+import { redirect } from "next/navigation";
+import { can, getTenantContext } from "@/server/context";
 import { listContactsForBoard } from "@/server/data/contacts";
 import { listStages } from "@/server/data/stages";
 import { SquareKanban } from "lucide-react";
@@ -9,11 +10,13 @@ export const metadata = { title: "Funil" };
 
 export default async function FunilPage() {
   const ctx = await getTenantContext();
+  if (!can(ctx, "contatos.ver")) redirect("/dashboard");
   const [stages, contacts] = await Promise.all([listStages(ctx), listContactsForBoard(ctx)]);
   return (
     <div className="space-y-6">
       <PageHeader icon={SquareKanban} title="Funil de vendas" subtitle="Arraste os cards entre as etapas. As etapas são editadas em Configurações." />
       <KanbanBoard
+        readOnly={!can(ctx, "contatos.editar")}
         stages={stages}
         contacts={contacts.map((c) => ({
           id: c.id,
