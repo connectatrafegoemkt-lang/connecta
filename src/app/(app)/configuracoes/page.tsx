@@ -56,7 +56,7 @@ export default async function ConfiguracoesPage() {
 
       <section className="card">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="section-title"><Layers className="h-4 w-4 text-brand-600" /> Etapas do funil</h2>
+          <h2 className="section-title"><Layers className="h-4 w-4 text-accent" /> Etapas do funil</h2>
           {!isAdmin && <span className="chip"><Lock className="h-3 w-3" /> Somente administradores editam</span>}
         </div>
         <ul className="mt-5 space-y-2">
@@ -95,7 +95,7 @@ export default async function ConfiguracoesPage() {
       </section>
 
       <section className="card">
-        <h2 className="section-title"><Tag className="h-4 w-4 text-brand-600" /> Tags</h2>
+        <h2 className="section-title"><Tag className="h-4 w-4 text-accent" /> Tags</h2>
         <ul className="mt-4 flex flex-wrap gap-2">
           {tags.map((t) => (
             <li key={t.id} className="flex items-center gap-0.5">
@@ -115,17 +115,17 @@ export default async function ConfiguracoesPage() {
       </section>
 
       <section className="card">
-        <h2 className="section-title"><Users className="h-4 w-4 text-brand-600" /> Equipe</h2>
+        <h2 className="section-title"><Users className="h-4 w-4 text-accent" /> Equipe</h2>
         <ul className="mt-4 divide-y divide-line">
           {members.map((m) => (
             <li key={m.id} className="flex flex-wrap items-center gap-3 py-3 text-sm">
-              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-brand-100 text-brand-700 text-xs font-semibold">
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-accent-soft text-accent-strong text-xs font-semibold">
                 {(m.display_name ?? "U").slice(0, 1).toUpperCase()}
               </span>
               <span className="flex-1">
                 <span className="block font-medium">{m.display_name ?? "Usuário"}{m.user_id === ctx.userId && <span className="text-muted"> (você)</span>}</span>
                 <span className="flex items-center gap-1 text-xs text-muted">
-                  {m.role === "admin" ? <ShieldCheck className="h-3 w-3 text-brand-600" /> : <UserRound className="h-3 w-3" />}
+                  {m.role === "admin" ? <ShieldCheck className="h-3 w-3 text-accent" /> : <UserRound className="h-3 w-3" />}
                   {m.role === "admin" ? "Administrador" : "Atendente"}
                 </span>
               </span>
@@ -150,7 +150,7 @@ export default async function ConfiguracoesPage() {
         </ul>
         {isAdmin && (
           <div className="mt-4 rounded-xl border border-dashed border-line p-4">
-            <p className="flex items-center gap-2 text-sm font-medium"><UserPlus className="h-4 w-4 text-brand-600" /> Adicionar pessoa</p>
+            <p className="flex items-center gap-2 text-sm font-medium"><UserPlus className="h-4 w-4 text-accent" /> Adicionar pessoa</p>
             <ActionForm action={inviteMemberAction} resetOnSuccess className="mt-3 grid gap-2 md:grid-cols-5" submitLabel="Criar usuário" submitIcon={<UserPlus className="h-4 w-4" />}>
               <input name="display_name" required placeholder="Nome" className="input" aria-label="Nome" />
               <input name="email" type="email" required placeholder="E-mail" className="input" aria-label="E-mail" />
@@ -166,7 +166,7 @@ export default async function ConfiguracoesPage() {
 
       {isAdmin && (
         <section className="card">
-          <h2 className="section-title"><History className="h-4 w-4 text-brand-600" /> Auditoria <span className="text-xs font-normal text-subtle">últimas 50 alterações</span></h2>
+          <h2 className="section-title"><History className="h-4 w-4 text-accent" /> Auditoria <span className="text-xs font-normal text-subtle">últimas 50 alterações</span></h2>
           <ul className="mt-4 space-y-1 text-sm">
             {logs.map((l) => (
               <li key={l.id} className="flex items-center gap-3 rounded-lg px-2 py-1.5 hover:bg-surface-2/50">

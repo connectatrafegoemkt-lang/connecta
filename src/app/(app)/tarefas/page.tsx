@@ -29,7 +29,7 @@ export default async function TarefasPage({ searchParams }: PageProps<"/tarefas"
       <PageHeader icon={ListTodo} title="Tarefas e lembretes" subtitle="Organize o follow-up da equipe e não perca nenhum retorno." />
 
       <div className="card">
-        <h2 className="section-title"><Plus className="h-4 w-4 text-brand-600" /> Nova tarefa</h2>
+        <h2 className="section-title"><Plus className="h-4 w-4 text-accent" /> Nova tarefa</h2>
         <ActionForm action={createTaskAction} resetOnSuccess className="mt-4 grid gap-3 md:grid-cols-6" submitLabel="Criar tarefa" submitIcon={<Plus className="h-4 w-4" />} submitClassName="btn-primary self-end md:col-start-6">
           <label className="md:col-span-3"><span className="label">Título *</span><input name="title" required placeholder="Ex.: Ligar para confirmar proposta" className="input" /></label>
           <label><span className="label">Prazo</span><input type="datetime-local" name="due_at" className="input" /></label>
@@ -48,7 +48,7 @@ export default async function TarefasPage({ searchParams }: PageProps<"/tarefas"
           <Link
             key={k}
             href={`/tarefas?status=${k}`}
-            className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition ${k === status ? "bg-brand-500/20 text-brand-700 shadow-[inset_0_0_0_1px_rgb(161_0_255/0.4)]" : "text-muted hover:text-fg"}`}
+            className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition ${k === status ? "bg-brand-500/20 text-accent-strong shadow-[inset_0_0_0_1px_rgb(161_0_255/0.4)]" : "text-muted hover:text-fg"}`}
           >
             <Icon className="h-4 w-4" /> {label}
           </Link>

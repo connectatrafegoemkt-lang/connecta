@@ -24,7 +24,7 @@ const LABEL: Record<Status, string> = {
 const TONE: Record<Status, string> = {
   desconectado: "border-line bg-surface-2 text-muted",
   aguardando_qr: "border-warning/40 bg-warning/10 text-warning",
-  conectando: "border-brand-500/40 bg-brand-500/10 text-brand-700",
+  conectando: "border-brand-500/40 bg-brand-500/10 text-accent-strong",
   conectado: "border-success/40 bg-success/10 text-success",
   erro: "border-danger/40 bg-danger/10 text-danger",
 };
@@ -123,12 +123,12 @@ export function ConnectionPanel({ initial, isAdmin, tenantId }: { initial: State
               <div className="h-64 w-64 [&>svg]:h-full [&>svg]:w-full" dangerouslySetInnerHTML={{ __html: qrSvg }} />
             ) : (
               <div className="flex h-64 w-64 items-center justify-center text-sm text-slate-500">
-                <Loader2 className="h-6 w-6 animate-spin text-brand-600" />
+                <Loader2 className="h-6 w-6 animate-spin text-accent" />
               </div>
             )}
           </div>
           <div>
-            <p className="flex items-center gap-2 font-semibold"><Smartphone className="h-4 w-4 text-brand-600" /> Conecte o celular da empresa</p>
+            <p className="flex items-center gap-2 font-semibold"><Smartphone className="h-4 w-4 text-accent" /> Conecte o celular da empresa</p>
             <ol className="mt-4 space-y-3 text-sm text-muted">
               {[
                 "Abra o WhatsApp no celular da empresa.",
@@ -137,7 +137,7 @@ export function ConnectionPanel({ initial, isAdmin, tenantId }: { initial: State
                 "O QR é renovado automaticamente. Mantenha esta tela aberta até conectar.",
               ].map((t, i) => (
                 <li key={i} className="flex gap-3">
-                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-500/15 text-xs font-semibold text-brand-700">{i + 1}</span>
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-500/15 text-xs font-semibold text-accent-strong">{i + 1}</span>
                   {t}
                 </li>
               ))}

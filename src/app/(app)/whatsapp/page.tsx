@@ -56,7 +56,7 @@ export default async function WhatsappPage({ searchParams }: PageProps<"/whatsap
       <div className="grid gap-4 lg:grid-cols-3">
         <aside className="card flex flex-col p-0 lg:col-span-1">
           <h2 className="section-title border-b border-line px-5 py-4">
-            <MessageSquareText className="h-4 w-4 text-brand-600" /> Conversas
+            <MessageSquareText className="h-4 w-4 text-accent" /> Conversas
           </h2>
           <ul className="max-h-[34rem] flex-1 overflow-y-auto p-2">
             {conversations.map((c) => {
@@ -67,7 +67,7 @@ export default async function WhatsappPage({ searchParams }: PageProps<"/whatsap
                     href={`/whatsapp?contato=${c.contact_id}`}
                     className={`flex items-center gap-3 rounded-xl px-3 py-3 transition ${active ? "bg-brand-500/15 shadow-[inset_0_0_0_1px_rgb(161_0_255/0.35)]" : "hover:bg-surface-2"}`}
                   >
-                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-100 text-brand-700 text-xs font-semibold">
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent-soft text-accent-strong text-xs font-semibold">
                       {c.name.slice(0, 1).toUpperCase()}
                     </span>
                     <span className="min-w-0 flex-1">
@@ -101,7 +101,7 @@ export default async function WhatsappPage({ searchParams }: PageProps<"/whatsap
                     {contact.name.slice(0, 1).toUpperCase()}
                   </span>
                   <div>
-                    <Link href={`/contatos/${contact.id}`} className="font-semibold hover:text-brand-700">
+                    <Link href={`/contatos/${contact.id}`} className="font-semibold hover:text-accent-strong">
                       {contact.name}
                     </Link>
                     <p className="flex items-center gap-1 text-xs text-muted"><Phone className="h-3 w-3" /> {phoneFmt(contact.phone)}</p>
