@@ -6,6 +6,7 @@ COPY package.json package-lock.json ./
 RUN npm ci --omit=dev && npm i --no-save tsx@4
 COPY tsconfig.json ./
 COPY worker ./worker
+COPY src/shared ./src/shared
 # scripts/ permite cadastrar clientes de dentro do container (create-tenant.ts)
 COPY scripts ./scripts
 USER node

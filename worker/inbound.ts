@@ -45,7 +45,16 @@ export type InboundResult = "stored" | "duplicate" | "ignored";
  * (o tenant dono da sessão que recebeu a mensagem). Procura o contato pelo
  * telefone somente dentro desse tenant; se não existir, cria.
  */
-export async function handleIncoming(repo: InboundRepo, msg: IncomingMessage): Promise<InboundResult> {
+export interface StoredInfo {
+  contactId: string;
+  fromMe: boolean;
+}
+
+export async function handleIncoming(
+  repo: InboundRepo,
+  msg: IncomingMessage,
+  onStored?: (info: StoredInfo) => void,
+): Promise<InboundResult> {
   const id = msg.key.id;
   const jid = msg.key.remoteJid;
   if (!id || !isIndividualChat(jid)) return "ignored";
@@ -72,6 +81,7 @@ export async function handleIncoming(repo: InboundRepo, msg: IncomingMessage): P
     status: msg.key.fromMe ? "enviado" : "recebido",
     metadata: { jid },
   });
+  if (row) onStored?.({ contactId: contact.id, fromMe: Boolean(msg.key.fromMe) });
   return row ? "stored" : "duplicate";
 }
 

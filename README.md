@@ -20,6 +20,10 @@ login e acesso **somente** aos próprios dados.
 - Log de auditoria
 - WhatsApp por QR code: uma sessão por tenant, mensagens recebidas viram
   interações no contato certo, envio e recebimento em tempo real
+- Atendimento por IA (ChatGPT/OpenAI) configurável por cliente: nicho, área de atuação,
+  serviços/produtos, perguntas frequentes, tom, regras e horários; modos
+  desligado, sugerir respostas ou responder sozinha com transferência para humano
+- Tema claro ou escuro, à escolha de cada usuário
 
 ## Arquitetura
 

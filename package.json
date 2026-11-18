@@ -20,6 +20,7 @@
     "@whiskeysockets/baileys": "^7.0.0-rc14",
     "lucide-react": "^1.74.0",
     "next": "16.4.6",
+    "openai": "^7.59.0",
     "pino": "^9.14.0",
     "qrcode": "^1.5.4",
     "react": "19.3.0",

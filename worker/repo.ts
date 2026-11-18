@@ -14,6 +14,7 @@ export interface OutboxItem {
   body: string;
   attempts: number;
   phone: string;
+  origin: "humano" | "ia";
 }
 
 export interface InboundRepo {
@@ -150,7 +151,7 @@ export class WorkerTenantRepo implements InboundRepo {
   async claimOutbox(limit = 10): Promise<OutboxItem[]> {
     const { data, error } = await this.sb
       .from("whatsapp_outbox")
-      .select("id, contact_id, body, attempts, contacts(phone)")
+      .select("id, contact_id, body, attempts, origin, contacts(phone)")
       .eq("tenant_id", this.tenantId)
       .eq("status", "pendente")
       .order("created_at")
@@ -162,6 +163,7 @@ export class WorkerTenantRepo implements InboundRepo {
       contact_id: string;
       body: string;
       attempts: number;
+      origin: "humano" | "ia";
       contacts: { phone: string | null } | null;
     }[]) {
       // trava otimista: só pega se ainda estiver pendente
@@ -178,7 +180,14 @@ export class WorkerTenantRepo implements InboundRepo {
         await this.finishOutbox(row.id, "erro", { error: "Contato sem telefone" });
         continue;
       }
-      claimed.push({ id: row.id, contact_id: row.contact_id, body: row.body, attempts: row.attempts + 1, phone: row.contacts.phone });
+      claimed.push({
+        id: row.id,
+        contact_id: row.contact_id,
+        body: row.body,
+        attempts: row.attempts + 1,
+        phone: row.contacts.phone,
+        origin: row.origin,
+      });
     }
     return claimed;
   }
@@ -189,6 +198,89 @@ export class WorkerTenantRepo implements InboundRepo {
       .update({ status, error: extra.error ?? null, interaction_id: extra.interaction_id ?? null })
       .eq("tenant_id", this.tenantId)
       .eq("id", id);
+    if (error) throw error;
+  }
+
+  // ---------- atendimento por IA ----------
+  async getAiSettingsRow() {
+    const { data, error } = await this.sb.from("ai_settings").select("*").eq("tenant_id", this.tenantId).maybeSingle();
+    if (error) throw error;
+    return data as Record<string, unknown> | null;
+  }
+
+  async getCompanyName(): Promise<string> {
+    const { data, error } = await this.sb.from("tenants").select("name").eq("id", this.tenantId).single();
+    if (error) throw error;
+    return (data as { name: string }).name;
+  }
+
+  async getContactAiState(contactId: string) {
+    const { data, error } = await this.sb
+      .from("contacts")
+      .select("id, name, ai_paused_until")
+      .eq("tenant_id", this.tenantId)
+      .eq("id", contactId)
+      .maybeSingle();
+    if (error) throw error;
+    return data as { id: string; name: string; ai_paused_until: string | null } | null;
+  }
+
+  /** Pausa a IA na conversa. `until = null` reativa; "infinity" pausa até alguém reativar. */
+  async setContactAiPause(contactId: string, until: string | null) {
+    const { error } = await this.sb
+      .from("contacts")
+      .update({ ai_paused_until: until })
+      .eq("tenant_id", this.tenantId)
+      .eq("id", contactId);
+    if (error) throw error;
+  }
+
+  async listWhatsappHistory(contactId: string, limit = 30) {
+    const { data, error } = await this.sb
+      .from("interactions")
+      .select("direction, body, occurred_at")
+      .eq("tenant_id", this.tenantId)
+      .eq("contact_id", contactId)
+      .eq("type", "whatsapp")
+      .order("occurred_at", { ascending: false })
+      .limit(limit);
+    if (error) throw error;
+    return ((data ?? []) as { direction: "entrada" | "saida"; body: string }[]).reverse();
+  }
+
+  async enqueueAiMessage(contactId: string, body: string) {
+    const { error } = await this.sb
+      .from("whatsapp_outbox")
+      .insert({ tenant_id: this.tenantId, contact_id: contactId, body, origin: "ia" });
+    if (error) throw error;
+  }
+
+  async insertSuggestion(contactId: string, body: string) {
+    // substitui sugestões pendentes anteriores da mesma conversa
+    await this.sb
+      .from("ai_suggestions")
+      .update({ status: "descartada" })
+      .eq("tenant_id", this.tenantId)
+      .eq("contact_id", contactId)
+      .eq("status", "pendente");
+    const { error } = await this.sb.from("ai_suggestions").insert({ tenant_id: this.tenantId, contact_id: contactId, body });
+    if (error) throw error;
+  }
+
+  async createHandoffTask(contactId: string, reason: string) {
+    const { error } = await this.sb.from("tasks").insert({
+      tenant_id: this.tenantId,
+      contact_id: contactId,
+      title: "Assumir atendimento no WhatsApp",
+      description: `A IA transferiu a conversa. Motivo: ${reason}`.slice(0, 5000),
+      due_at: new Date().toISOString(),
+      remind_at: new Date().toISOString(),
+    });
+    if (error) throw error;
+  }
+
+  async recordAiUsage(u: { contact_id: string | null; kind: "resposta" | "sugestao" | "teste"; model: string; input_tokens: number; output_tokens: number; cache_read_tokens: number }) {
+    const { error } = await this.sb.from("ai_usage").insert({ ...u, tenant_id: this.tenantId });
     if (error) throw error;
   }
 }
