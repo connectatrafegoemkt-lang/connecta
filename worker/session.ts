@@ -10,6 +10,8 @@ import type { CredentialCipher } from "./crypto";
 import { ackToStatus, handleIncoming, type IncomingMessage } from "./inbound";
 import { phoneToJid, jidToPhone } from "./phone";
 import type { WorkerTenantRepo } from "./repo";
+import type Anthropic from "@anthropic-ai/sdk";
+import { AiResponder } from "./ai-responder";
 
 /**
  * Uma conexão WhatsApp de UM tenant. Cada instância tem seu próprio socket,
@@ -21,12 +23,18 @@ export class TenantSession {
   private stopped = false;
   private retries = 0;
   connected = false;
+  private readonly ai: AiResponder;
 
   constructor(
     readonly repo: WorkerTenantRepo,
     private readonly cipher: CredentialCipher,
     private readonly log: Logger,
-  ) {}
+    anthropic: Anthropic | null = null,
+  ) {
+    this.ai = new AiResponder(repo, anthropic, log, () => {
+      void this.flushOutbox().catch((e) => this.log.error({ err: e }, "falha ao enviar resposta da IA"));
+    });
+  }
 
   get tenantId() {
     return this.repo.tenantId;
@@ -95,7 +103,11 @@ export class TenantSession {
     sock.ev.on("messages.upsert", async ({ messages }) => {
       for (const m of messages) {
         try {
-          await handleIncoming(this.repo, m as unknown as IncomingMessage);
+          await handleIncoming(this.repo, m as unknown as IncomingMessage, ({ contactId, fromMe }) => {
+            // Mensagem enviada pelo celular por uma pessoa = humano assumiu.
+            if (fromMe) void this.ai.pauseForHuman(contactId).catch(() => undefined);
+            else this.ai.schedule(contactId);
+          });
         } catch (e) {
           this.log.error({ err: e }, "falha ao registrar mensagem");
         }
@@ -128,9 +140,10 @@ export class TenantSession {
           external_id: externalId,
           occurred_at: new Date().toISOString(),
           status: "enviado",
-          metadata: { outbox_id: item.id },
+          metadata: { outbox_id: item.id, ai: item.origin === "ia" },
         });
         await this.repo.finishOutbox(item.id, "enviado", { interaction_id: inter?.id });
+        if (item.origin === "humano") await this.ai.pauseForHuman(item.contact_id).catch(() => undefined);
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         this.log.warn({ err: e, outbox: item.id }, "falha ao enviar");
@@ -142,6 +155,7 @@ export class TenantSession {
   /** Para a sessão. Com logout=true desvincula o aparelho e apaga credenciais. */
   async stop(logout: boolean) {
     this.stopped = true;
+    this.ai.cancelAll();
     this.connected = false;
     const sock = this.sock;
     this.sock = null;
