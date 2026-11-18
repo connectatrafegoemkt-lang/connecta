@@ -15,7 +15,8 @@ fresh() {
 migrar() { DATABASE_URL="$URL" bash deploy/migrar-banco.sh; }
 count() { psql "$URL" -At -c "select count(*) from supabase_migrations.schema_migrations"; }
 total=$(ls supabase/migrations/*.sql | wc -l)
-schema() { pg_dump -s --no-owner "$URL" | grep -v '^\\\|^--' | grep -v 'supabase_migrations' | sort; }
+# pg_dump 16 contra servidor 17 escreve "pg_attver=<número>" variável: não é esquema, é ruído.
+schema() { pg_dump -s --no-owner "$URL" | grep -v '^\\\|^--' | grep -v 'supabase_migrations' | grep -v 'pg_attver=' | sort; }
 
 echo "== 1. banco novo: aplica tudo"
 fresh
