@@ -2,18 +2,80 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import {
+  LayoutDashboard,
+  ListTodo,
+  MessageCircle,
+  Settings,
+  SquareKanban,
+  Users,
+  type LucideIcon,
+} from "lucide-react";
 
-export function NavLink({ href, children }: { href: string; children: React.ReactNode }) {
+export const NAV: { href: string; label: string; icon: LucideIcon }[] = [
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/contatos", label: "Contatos", icon: Users },
+  { href: "/funil", label: "Funil", icon: SquareKanban },
+  { href: "/tarefas", label: "Tarefas", icon: ListTodo },
+  { href: "/whatsapp", label: "WhatsApp", icon: MessageCircle },
+  { href: "/configuracoes", label: "Configurações", icon: Settings },
+];
+
+function useActive(href: string) {
   const path = usePathname();
-  const active = path === href || path.startsWith(`${href}/`);
+  return path === href || path.startsWith(`${href}/`);
+}
+
+export function SideNavLink({ href, label, icon: Icon }: (typeof NAV)[number]) {
+  const active = useActive(href);
   return (
     <Link
       href={href}
-      className={`block rounded-lg px-3 py-2 text-sm font-medium ${
-        active ? "bg-sky-50 text-sky-700" : "text-slate-600 hover:bg-slate-100"
+      aria-current={active ? "page" : undefined}
+      className={`group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${
+        active
+          ? "bg-gradient-to-r from-brand-500/20 to-brand-500/5 text-fg"
+          : "text-muted hover:bg-surface-2 hover:text-fg"
       }`}
     >
-      {children}
+      {active && <span className="absolute inset-y-2 left-0 w-1 rounded-full bg-brand-500 shadow-[0_0_12px_rgb(161_0_255)]" />}
+      <Icon className={`h-[18px] w-[18px] ${active ? "text-brand-300" : "text-subtle group-hover:text-brand-300"}`} />
+      {label}
     </Link>
+  );
+}
+
+export function MobileNavLink({ href, label, icon: Icon }: (typeof NAV)[number]) {
+  const active = useActive(href);
+  return (
+    <Link
+      href={href}
+      className={`flex shrink-0 flex-col items-center gap-1 rounded-xl px-3 py-2 text-[11px] font-medium ${
+        active ? "bg-brand-500/15 text-brand-200" : "text-muted"
+      }`}
+    >
+      <Icon className="h-5 w-5" />
+      {label}
+    </Link>
+  );
+}
+
+export function SideNav() {
+  return (
+    <nav className="space-y-1">
+      {NAV.map((item) => (
+        <SideNavLink key={item.href} {...item} />
+      ))}
+    </nav>
+  );
+}
+
+export function MobileNav() {
+  return (
+    <nav className="flex gap-1 overflow-x-auto">
+      {NAV.map((item) => (
+        <MobileNavLink key={item.href} {...item} />
+      ))}
+    </nav>
   );
 }
