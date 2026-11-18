@@ -1,5 +1,6 @@
 import makeWASocket, {
   Browsers,
+  downloadMediaMessage,
   DisconnectReason,
   makeCacheableSignalKeyStore,
   type WASocket,
@@ -9,6 +10,7 @@ import { loadTenantAuthState } from "./auth-state";
 import type { CredentialCipher } from "./crypto";
 import { ackToStatus, handleIncoming, type IncomingMessage } from "./inbound";
 import { phoneToJid, jidToPhone } from "./phone";
+import { describeMedia, extFromMime, MAX_MEDIA_BYTES, safeName, toOggOpus, type MediaMeta } from "./media";
 import type { WorkerTenantRepo } from "./repo";
 import type { ChatClient } from "../src/shared/ai/agent";
 import { AiResponder } from "./ai-responder";
@@ -103,10 +105,13 @@ export class TenantSession {
     sock.ev.on("messages.upsert", async ({ messages }) => {
       for (const m of messages) {
         try {
-          await handleIncoming(this.repo, m as unknown as IncomingMessage, ({ contactId, fromMe }) => {
-            // Mensagem enviada pelo celular por uma pessoa = humano assumiu.
-            if (fromMe) void this.ai.pauseForHuman(contactId).catch(() => undefined);
-            else this.ai.schedule(contactId);
+          await handleIncoming(this.repo, m as unknown as IncomingMessage, {
+            onStored: ({ contactId, fromMe }) => {
+              // Mensagem enviada pelo celular por uma pessoa = humano assumiu.
+              if (fromMe) void this.ai.pauseForHuman(contactId).catch(() => undefined);
+              else this.ai.schedule(contactId);
+            },
+            saveMedia: ({ contactId, externalId }) => this.saveIncomingMedia(m, contactId, externalId),
           });
         } catch (e) {
           this.log.error({ err: e }, "falha ao registrar mensagem");
@@ -124,23 +129,65 @@ export class TenantSession {
     });
   }
 
+  /** Baixa a mídia recebida e guarda em <tenant>/whatsapp/<contato>/. */
+  private async saveIncomingMedia(m: unknown, contactId: string, externalId: string): Promise<MediaMeta | null> {
+    const info = describeMedia((m as IncomingMessage).message);
+    if (!info || info.size > MAX_MEDIA_BYTES) return null;
+    const buf = (await downloadMediaMessage(m as never, "buffer", {}, {
+      logger: this.log,
+      reuploadRequest: this.sock!.updateMediaMessage,
+    })) as Buffer;
+    const name = info.filename ? safeName(info.filename) : `${safeName(externalId)}.${extFromMime(info.mime)}`;
+    const path = `${this.tenantId}/whatsapp/${contactId}/${Date.now()}-${name}`;
+    await this.repo.uploadMedia(path, buf, info.mime.split(";")[0]);
+    return { kind: info.kind, path, mime: info.mime, filename: info.filename };
+  }
+
+  /** Monta o conteúdo do Baileys para um item da fila (texto ou mídia). */
+  private async contentFor(item: Awaited<ReturnType<WorkerTenantRepo["claimOutbox"]>>[number]) {
+    if (!item.media_path || !item.media_kind) return { text: item.body };
+    const buf = await this.repo.downloadMedia(item.media_path);
+    const caption = item.body || undefined;
+    switch (item.media_kind) {
+      case "audio": {
+        const isOgg = (item.media_mime ?? "").startsWith("audio/ogg");
+        return { audio: isOgg ? buf : await toOggOpus(buf), mimetype: "audio/ogg; codecs=opus", ptt: true };
+      }
+      case "image":
+        return { image: buf, caption };
+      case "video":
+        return { video: buf, caption };
+      default:
+        return {
+          document: buf,
+          mimetype: item.media_mime ?? "application/octet-stream",
+          fileName: item.media_filename ?? "arquivo",
+          caption,
+        };
+    }
+  }
+
   /** Envia as mensagens pendentes da fila DESTE tenant. */
   async flushOutbox() {
     if (!this.sock || !this.connected) return;
     const items = await this.repo.claimOutbox();
     for (const item of items) {
       try {
-        const sent = await this.sock.sendMessage(phoneToJid(item.phone), { text: item.body });
+        const sent = await this.sock.sendMessage(phoneToJid(item.phone), (await this.contentFor(item)) as never);
         const externalId = sent?.key.id;
         if (!externalId) throw new Error("sem id de mensagem");
         const inter = await this.repo.insertInteraction({
           contact_id: item.contact_id,
           direction: "saida",
-          body: item.body,
+          body: item.body || ({ audio: "[áudio]", image: "[imagem]", video: "[vídeo]", document: `[documento] ${item.media_filename ?? ""}`.trim() } as Record<string, string>)[item.media_kind ?? ""] || "",
           external_id: externalId,
           occurred_at: new Date().toISOString(),
           status: "enviado",
-          metadata: { outbox_id: item.id, ai: item.origin === "ia" },
+          metadata: {
+            outbox_id: item.id,
+            ai: item.origin === "ia",
+            ...(item.media_path ? { media: { kind: item.media_kind, path: item.media_path, mime: item.media_mime, filename: item.media_filename } } : {}),
+          },
         });
         await this.repo.finishOutbox(item.id, "enviado", { interaction_id: inter?.id });
         if (item.origin === "humano") await this.ai.pauseForHuman(item.contact_id).catch(() => undefined);
