@@ -10,6 +10,10 @@ export const TENANT_TABLES = [
   "tasks",
   "memberships",
   "audit_logs",
+  "whatsapp_sessions",
+  "whatsapp_qr",
+  "whatsapp_outbox",
+  // whatsapp_auth_keys fica DE FORA de propósito: só o worker acessa.
 ] as const;
 export type TenantTable = (typeof TENANT_TABLES)[number];
 
@@ -65,8 +69,10 @@ export class TenantDb {
   }
 
   /** RPCs permitidas: todas derivam o tenant internamente via auth.uid(). */
-  rpc(fn: "dashboard_summary") {
-    return this.sb.rpc(fn);
+  rpc(fn: "dashboard_summary"): ReturnType<SupabaseClient["rpc"]>;
+  rpc(fn: "whatsapp_request", args: { p_action: "conectar" | "desconectar" }): ReturnType<SupabaseClient["rpc"]>;
+  rpc(fn: "dashboard_summary" | "whatsapp_request", args?: Record<string, unknown>) {
+    return this.sb.rpc(fn, args);
   }
 
   /** Storage: todo caminho é prefixado com o tenant e validado. */

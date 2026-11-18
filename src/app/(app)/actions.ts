@@ -18,6 +18,7 @@ import {
   tagCreateSchema,
   taskCreateSchema,
   taskUpdateSchema,
+  whatsappSendSchema,
 } from "@/server/validation";
 import { createContact, deleteContact, moveContact, updateContact } from "@/server/data/contacts";
 import { createInteraction, deleteInteraction } from "@/server/data/interactions";
@@ -25,6 +26,7 @@ import { createTask, deleteTask, updateTask } from "@/server/data/tasks";
 import { createStage, deleteStage, reorderStages, updateStage } from "@/server/data/stages";
 import { createTag, deleteTag } from "@/server/data/tags";
 import { inviteMember, removeMember, updateMember } from "@/server/data/members";
+import { queueWhatsappMessage, requestWhatsapp } from "@/server/data/whatsapp";
 
 /*
  * Server Actions. Regras:
@@ -241,6 +243,39 @@ export async function removeMemberAction(_: ActionState, fd: FormData): Promise<
     const ctx = await getTenantContext();
     await removeMember(ctx, parseOrThrow(idSchema, fd.get("id")));
     revalidatePath("/configuracoes");
+    return { ok: true };
+  } catch (e) {
+    return toActionError(e);
+  }
+}
+
+// ---------------------------------------------------------------- WhatsApp
+
+export async function whatsappConnectAction(): Promise<ActionState> {
+  try {
+    await requestWhatsapp(await getTenantContext(), "conectar");
+    revalidatePath("/whatsapp");
+    return { ok: true };
+  } catch (e) {
+    return toActionError(e);
+  }
+}
+
+export async function whatsappDisconnectAction(): Promise<ActionState> {
+  try {
+    await requestWhatsapp(await getTenantContext(), "desconectar");
+    revalidatePath("/whatsapp");
+    return { ok: true };
+  } catch (e) {
+    return toActionError(e);
+  }
+}
+
+export async function whatsappSendAction(_: ActionState, fd: FormData): Promise<ActionState> {
+  try {
+    const ctx = await getTenantContext();
+    const { contact_id, body } = parseOrThrow(whatsappSendSchema, pick(fd, ["contact_id", "body"]));
+    await queueWhatsappMessage(ctx, contact_id, body);
     return { ok: true };
   } catch (e) {
     return toActionError(e);

@@ -5,28 +5,103 @@ login e acesso **somente** aos próprios dados.
 
 ## Stack
 
-- Next.js (App Router) + TypeScript
+- Next.js 16 (App Router) + TypeScript + Tailwind 4
 - Supabase: Postgres com Row Level Security, Auth, Storage e Realtime
-- Tailwind CSS
+- Worker Node.js separado para o WhatsApp (Baileys, QR code)
 
-## Funcionalidades (roadmap)
+## Funcionalidades
 
-- Leads/contatos, tags
-- Funil kanban com etapas editáveis
-- Histórico de interações
+- Leads/contatos com busca, filtros e tags
+- Funil kanban com arrastar e soltar e etapas editáveis
+- Histórico de interações (nota, ligação, e-mail, reunião, WhatsApp) em tempo real
 - Tarefas e lembretes
 - Dashboard
-- WhatsApp por QR code (uma sessão por tenant, credenciais criptografadas)
+- Usuários por tenant com papéis **admin** e **atendente**
+- Log de auditoria
+- WhatsApp por QR code: uma sessão por tenant, mensagens recebidas viram
+  interações no contato certo, envio e recebimento em tempo real
 
-## Segurança e isolamento
+## Arquitetura
 
-O isolamento entre tenants é garantido em camadas:
+```
+Navegador ──(cookie de sessão)──▶ Next.js ──(JWT do usuário, RLS)──▶ Supabase
+   │                                 │  getTenantContext() → TenantDb
+   └──── Realtime (RLS) ◀────────────┴────────────────────────────── Postgres
+                                                                       ▲
+Worker WhatsApp (service_role, 1 sessão Baileys por tenant) ───────────┘
+   credenciais cifradas (AES-256-GCM, chave por tenant) em whatsapp_auth_keys
+```
 
-1. **Banco**: `tenant_id NOT NULL` em todas as tabelas de negócio e RLS em todas
-   as tabelas.
-2. **Servidor**: o tenant é derivado da sessão autenticada; o front nunca envia
-   `tenant_id`.
-3. **Camada de dados única** que injeta o tenant em toda query.
-4. **Testes automatizados** que tentam acessar dados de outro tenant em cada PR.
+### Isolamento entre tenants (em camadas)
+
+1. **Banco**: `tenant_id NOT NULL` + índice em toda tabela de negócio, RLS em
+   todas as tabelas, trigger que força o `tenant_id` da sessão e FKs compostas
+   `(tenant_id, id)` que impedem ligar registros de tenants diferentes.
+2. **Servidor**: o tenant vem do JWT (`current_context()`), nunca do front. As
+   APIs rejeitam `tenant_id` na query, header ou corpo.
+3. **Camada única de acesso** (`src/server/data/tenant-db.ts`): toda query
+   recebe o filtro de tenant automaticamente. O ESLint proíbe acessar o
+   Supabase fora de `src/server`.
+4. **Storage**: bucket privado `tenant-files` com caminho `<tenant_id>/...`.
+5. **WhatsApp**: o worker usa um repositório preso ao tenant da sessão; o
+   tenant nunca é deduzido do conteúdo da mensagem.
+6. **Testes automatizados** (`tests/isolation/`) em todo PR: o tenant A tenta
+   ler, criar, editar e excluir dados do tenant B pelo banco, pela API do
+   Supabase, pela API do app, pela interface (Playwright) e pelo WhatsApp.
+
+## Rodando localmente
+
+Pré-requisitos: Node 22, Docker e [Supabase CLI](https://supabase.com/docs/guides/cli).
+
+```bash
+npm install
+supabase start                 # sobe Postgres/Auth/Storage/Realtime e aplica as migrations
+supabase status -o env         # copie API_URL, ANON_KEY e SERVICE_ROLE_KEY
+cp .env.example .env.local     # preencha com os valores acima (NUNCA commite)
+```
+
+Crie o primeiro cliente (tenant) e seu admin:
+
+```bash
+SUPABASE_URL=http://127.0.0.1:54321 SUPABASE_SERVICE_ROLE_KEY=... \
+  npx tsx scripts/create-tenant.ts "Escritório Exemplo" escritorio-exemplo admin@exemplo.com "Senha-Forte-123" "Admin"
+```
+
+```bash
+npm run dev       # app em http://localhost:3000
+npm run worker    # worker do WhatsApp (precisa de WHATSAPP_CREDENTIALS_KEY)
+```
+
+### Testes
+
+```bash
+npm run lint && npm run typecheck
+npm test                       # unitários (camada de dados, validação, worker)
+
+# isolamento no banco (Postgres local, sem Docker):
+DATABASE_URL=postgres://postgres:postgres@127.0.0.1:5432/connecta_test scripts/db-reset-local.sh
+npm run test:isolation:db
+
+# isolamento via APIs (com supabase start + app rodando):
+SUPABASE_URL=... SUPABASE_ANON_KEY=... SUPABASE_SERVICE_ROLE_KEY=... APP_URL=http://127.0.0.1:3000 \
+  npm run test:isolation:api
+```
+
+## WhatsApp
+
+1. Em **WhatsApp** no painel, o admin clica em **Conectar WhatsApp**.
+2. O worker abre uma sessão só para aquele tenant e publica o QR code (só
+   admins do tenant o recebem, via Realtime com RLS).
+3. No celular: *Dispositivos conectados → Conectar um dispositivo*.
+4. Mensagens recebidas viram interações no contato com aquele telefone **dentro
+   do tenant** (se não existir, o contato é criado). Mensagens enviadas pelo
+   painel entram na fila do tenant e o worker envia.
+
+Deploy do worker: é um processo de longa duração (não serverless). Use
+`worker/Dockerfile` em uma VM/container com 1 réplica e as variáveis
+`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` e `WHATSAPP_CREDENTIALS_KEY`.
+
+> Aviso: a integração usa o protocolo do WhatsApp Web (biblioteca não
+> oficial). Para alto volume, avalie a API oficial do WhatsApp Business.
 
 Veja [CLAUDE.md](./CLAUDE.md) para as regras completas do projeto.

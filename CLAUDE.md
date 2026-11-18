@@ -32,8 +32,12 @@ Realtime), Tailwind CSS.
    única `src/server/data/` (`getTenantContext()` → repositórios), que injeta o
    tenant. É proibido usar `createClient` do Supabase fora de `src/server/`.
 5. O cliente `service_role` (bypassa RLS) só pode ser usado em
-   `src/server/admin/` e no worker do WhatsApp, sempre com `tenant_id` explícito
-   obtido de fonte confiável (sessão WhatsApp do próprio tenant), nunca do front.
+   `src/server/admin/` e no worker do WhatsApp (`worker/`), sempre com
+   `tenant_id` explícito obtido de fonte confiável (sessão do usuário ou sessão
+   WhatsApp do próprio tenant), nunca do front nem do conteúdo de mensagens.
+   No worker, todo acesso passa por `WorkerTenantRepo` (preso a um tenant).
+   `whatsapp_auth_keys` guarda credenciais cifradas (AES-256-GCM, chave por
+   tenant via HKDF + AAD) e não tem policy para usuários.
 6. Storage: bucket privado `tenant-files`, caminho `<tenant_id>/...`, policies
    comparando o primeiro segmento do caminho com o tenant do usuário.
 7. Roles por tenant: `admin` e `atendente` (tabela `memberships`).
@@ -58,4 +62,6 @@ Realtime), Tailwind CSS.
 - `npm run dev` — Next.js local
 - `npm run lint` / `npm run typecheck`
 - `npm test` — testes unitários
-- `npm run test:isolation` — testes de isolamento (exige banco: veja README)
+- `npm run test:isolation:db` — isolamento no banco (Postgres local, veja README)
+- `npm run test:isolation:api` — isolamento via APIs/UI/WhatsApp (exige Supabase + app)
+- `npm run worker` — worker do WhatsApp
