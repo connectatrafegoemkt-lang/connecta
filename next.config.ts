@@ -12,6 +12,8 @@ const nextConfig: NextConfig = {
   // Não usamos Cache Components para evitar qualquer risco de cache
   // compartilhado entre tenants.
   poweredByHeader: false,
+  // Gera um servidor enxuto em .next/standalone para rodar em container (VPS).
+  output: "standalone",
   serverExternalPackages: ["@whiskeysockets/baileys", "pg"],
   turbopack: {
     rules: {
