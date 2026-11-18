@@ -149,3 +149,8 @@ export const platformTenantCreateSchema = z.strictObject({
   admin_password: z.string().min(10).max(200),
   admin_name: z.string().trim().min(1).max(100),
 });
+
+export const platformSuspendSchema = z.strictObject({
+  suspenso: z.boolean(),
+  motivo: z.string().trim().max(300).optional(),
+});
