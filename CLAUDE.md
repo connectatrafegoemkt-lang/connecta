@@ -23,7 +23,7 @@ Realtime), Tailwind CSS.
 
 1. Toda tabela de negócio tem `tenant_id uuid NOT NULL` + índice (de preferência
    composto começando por `tenant_id`).
-2. RLS **ativado e forçado** em TODAS as tabelas do schema `public`, com policies
+2. RLS **ativado** em TODAS as tabelas do schema `public`, com policies
    que filtram por `tenant_id` do usuário autenticado (`app.current_tenant_id()`).
 3. O `tenant_id` vem SEMPRE da sessão/JWT no servidor. Nunca aceitar
    `tenant_id` vindo do front (body, query string, header). Validadores Zod das
@@ -47,9 +47,9 @@ Realtime), Tailwind CSS.
 
 - [ ] `tenant_id uuid not null references tenants(id) on delete cascade`
 - [ ] índice começando por `tenant_id`
-- [ ] `alter table ... enable row level security; ... force row level security;`
+- [ ] `alter table ... enable row level security;` (sem FORCE: as funções SECURITY DEFINER de contexto leem `memberships` como dono)
 - [ ] policies select/insert/update/delete usando `app.current_tenant_id()`
-- [ ] trigger `app.set_tenant_id()` (preenche/valida tenant pelo JWT)
+- [ ] trigger `app.enforce_tenant_id()` (preenche/valida tenant pelo JWT)
 - [ ] trigger de auditoria `app.audit_trigger()`
 - [ ] adicionada em `tests/isolation/`
 

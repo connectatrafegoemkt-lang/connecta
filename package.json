@@ -9,7 +9,9 @@
     "lint": "eslint",
     "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run --dir src",
-    "test:isolation": "vitest run --dir tests/isolation --no-file-parallelism"
+    "test:isolation": "vitest run --dir tests/isolation --no-file-parallelism",
+    "test:isolation:db": "vitest run tests/isolation/db --no-file-parallelism",
+    "test:isolation:api": "vitest run tests/isolation/api --no-file-parallelism"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",
