@@ -118,6 +118,17 @@ describe("pausa e origem das mensagens", () => {
     expect(r.rowCount).toBe(0);
   });
 
+  it("IA começa desligada em todo contato e A não ativa a IA num contato de B", async () => {
+    const [c] = await raw<{ ai_enabled: boolean }>("select ai_enabled from public.contacts where id = $1", [A.contactId]);
+    expect(c.ai_enabled).toBe(false);
+    const r = await as({ userId: A.adminId }, (q) =>
+      q("update public.contacts set ai_enabled = true where id = $1", [B.contactId]),
+    );
+    expect(r.rowCount).toBe(0);
+    const [b] = await raw<{ ai_enabled: boolean }>("select ai_enabled from public.contacts where id = $1", [B.contactId]);
+    expect(b.ai_enabled).toBe(false);
+  });
+
   it("usuário não consegue se passar pela IA na fila de envio (origin)", async () => {
     await as({ userId: A.atendenteId }, (q) =>
       q("update public.contacts set phone = '5511955551111' where id = $1", [A.contactId]),
