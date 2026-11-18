@@ -1,10 +1,10 @@
-import { Bot, Building2, Contact, MessageCircle, Plus, ShieldCheck, Users } from "lucide-react";
+import { Ban, Bot, Building2, CirclePlay, Contact, MessageCircle, Plus, ShieldCheck, Users } from "lucide-react";
 import { getPlatformContext, listClientTenants } from "@/server/platform";
 import { ActionForm } from "@/components/action-form";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { dateTime } from "@/components/format";
-import { createClientTenantAction } from "./actions";
+import { createClientTenantAction, setClientSuspendedAction } from "./actions";
 
 const WA_LABEL: Record<string, { label: string; cls: string }> = {
   conectado: { label: "Conectado", cls: "text-success" },
@@ -26,11 +26,12 @@ export default async function PlataformaPage() {
       contacts: acc.contacts + c.contacts,
       wa: acc.wa + (c.whatsapp_status === "conectado" ? 1 : 0),
       ai: acc.ai + c.ai_messages_month,
+      suspended: acc.suspended + (c.suspended_at ? 1 : 0),
     }),
-    { users: 0, contacts: 0, wa: 0, ai: 0 },
+    { users: 0, contacts: 0, wa: 0, ai: 0, suspended: 0 },
   );
   const stats = [
-    { icon: Building2, label: "Clientes", value: num(clients.length) },
+    { icon: Building2, label: totals.suspended ? `Clientes (${totals.suspended} suspenso${totals.suspended > 1 ? "s" : ""})` : "Clientes", value: num(clients.length) },
     { icon: Users, label: "Usuários", value: num(totals.users) },
     { icon: Contact, label: "Contatos", value: num(totals.contacts) },
     { icon: MessageCircle, label: "WhatsApp conectados", value: num(totals.wa) },
@@ -83,16 +84,23 @@ export default async function PlataformaPage() {
                   <th className="px-5 py-3">IA</th>
                   <th className="px-5 py-3 text-right">IA no mês</th>
                   <th className="px-5 py-3">Desde</th>
+                  <th className="px-5 py-3">Acesso</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-line">
                 {clients.map((c) => {
                   const wa = WA_LABEL[c.whatsapp_status ?? "desconectado"] ?? WA_LABEL.desconectado;
                   return (
-                    <tr key={c.id} className="transition hover:bg-surface-2/60">
+                    <tr key={c.id} className={`transition hover:bg-surface-2/60 ${c.suspended_at ? "bg-danger/5" : ""}`}>
                       <td className="px-5 py-3">
                         <span className="block font-medium">{c.name}</span>
                         <span className="block font-mono text-xs text-subtle">{c.slug}</span>
+                        {c.suspended_at && (
+                          <span className="mt-1 inline-flex items-start gap-1 rounded-lg bg-danger/10 px-2 py-1 text-xs font-medium text-danger">
+                            <Ban className="mt-0.5 h-3 w-3 shrink-0" /> Suspenso desde {dateTime(c.suspended_at)}
+                            {c.suspended_reason ? ` · ${c.suspended_reason}` : ""}
+                          </span>
+                        )}
                       </td>
                       <td className="px-5 py-3 text-right tabular-nums">{num(c.members)}</td>
                       <td className="px-5 py-3 text-right tabular-nums">{num(c.contacts)}</td>
@@ -102,6 +110,31 @@ export default async function PlataformaPage() {
                         {num(c.ai_messages_month)} resp. · {num(Math.round(c.ai_tokens_month / 1000))} mil tokens
                       </td>
                       <td className="whitespace-nowrap px-5 py-3 text-muted">{dateTime(c.created_at)}</td>
+                      <td className="px-5 py-3">
+                        {c.suspended_at ? (
+                          <ActionForm action={setClientSuspendedAction} submitLabel="Reativar" submitIcon={<CirclePlay className="h-3.5 w-3.5" />} submitClassName="btn-primary btn-sm whitespace-nowrap">
+                            <input type="hidden" name="id" value={c.id} />
+                            <input type="hidden" name="acao" value="reativar" />
+                          </ActionForm>
+                        ) : (
+                          <details className="relative">
+                            <summary className="btn-danger btn-sm cursor-pointer list-none whitespace-nowrap">
+                              <Ban className="h-3.5 w-3.5" /> Suspender
+                            </summary>
+                            <div className="absolute right-0 z-10 mt-2 w-72 rounded-xl border border-line bg-surface p-3 text-left shadow-xl">
+                              <p className="text-sm font-medium">Suspender {c.name}?</p>
+                              <p className="mt-1 text-xs text-muted">
+                                A equipe do cliente perde o acesso ao CRM e o WhatsApp/IA param. Nenhum dado é apagado; ao reativar, tudo volta como estava.
+                              </p>
+                              <ActionForm action={setClientSuspendedAction} className="mt-3 space-y-2" submitLabel="Confirmar suspensão" submitIcon={<Ban className="h-3.5 w-3.5" />} submitClassName="btn-danger btn-sm w-full">
+                                <input type="hidden" name="id" value={c.id} />
+                                <input type="hidden" name="acao" value="suspender" />
+                                <input name="motivo" maxLength={300} defaultValue="Pagamento em atraso" className="input py-1.5 text-sm" aria-label="Motivo" />
+                              </ActionForm>
+                            </div>
+                          </details>
+                        )}
+                      </td>
                     </tr>
                   );
                 })}

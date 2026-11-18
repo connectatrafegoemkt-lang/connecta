@@ -1,9 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getPlatformContext, createClientTenant } from "@/server/platform";
+import { getPlatformContext, createClientTenant, setClientSuspended } from "@/server/platform";
 import { parseOrThrow, pick, toActionError, type ActionState } from "@/server/forms";
-import { platformTenantCreateSchema } from "@/server/validation";
+import { idSchema, platformTenantCreateSchema } from "@/server/validation";
 
 export async function createClientTenantAction(_: ActionState, fd: FormData): Promise<ActionState> {
   try {
@@ -15,6 +15,20 @@ export async function createClientTenantAction(_: ActionState, fd: FormData): Pr
     await createClientTenant(p, input);
     revalidatePath("/plataforma");
     return { ok: true, message: `Cliente "${input.name}" criado. O administrador já pode entrar com o e-mail ${input.admin_email}.` };
+  } catch (e) {
+    return toActionError(e);
+  }
+}
+
+export async function setClientSuspendedAction(_: ActionState, fd: FormData): Promise<ActionState> {
+  try {
+    const p = await getPlatformContext();
+    const id = parseOrThrow(idSchema, fd.get("id"));
+    const suspend = fd.get("acao") === "suspender";
+    const reason = String(fd.get("motivo") ?? "").trim().slice(0, 300) || null;
+    await setClientSuspended(p, id, suspend, reason);
+    revalidatePath("/plataforma");
+    return { ok: true, message: suspend ? "Cliente suspenso." : "Cliente reativado." };
   } catch (e) {
     return toActionError(e);
   }
