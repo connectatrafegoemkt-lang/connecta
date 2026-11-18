@@ -1,7 +1,9 @@
 import { redirect } from "next/navigation";
-import { Building2, LogOut, ShieldCheck, UserRound } from "lucide-react";
+import { Building2, LayoutGrid, LogOut, ShieldCheck, UserRound } from "lucide-react";
 import { can, getTenantContext } from "@/server/context";
 import { profileLabel } from "@/shared/permissions";
+import { isPlatformAdmin } from "@/server/platform";
+import Link from "next/link";
 import { HttpError } from "@/server/errors";
 import { MobileNav, SideNav } from "@/components/nav-link";
 import { LogoMark, Wordmark } from "@/components/logo";
@@ -30,6 +32,11 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
             <LogoMark size={72} className="mx-auto" />
             <h1 className="mt-4 text-xl font-semibold">Sem acesso</h1>
             <p className="mt-2 text-sm text-muted">Seu usuário não está vinculado a nenhuma empresa.</p>
+            {(await isPlatformAdmin()) && (
+              <Link href="/plataforma" className="btn-primary mt-5 w-full">
+                <LayoutGrid className="h-4 w-4" /> Abrir o Painel da CONNECTA
+              </Link>
+            )}
             <form action="/auth/signout" method="post" className="mt-5">
               <button className="btn-secondary w-full">
                 <LogOut className="h-4 w-4" /> Sair
@@ -53,7 +60,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
     ...(can(ctx, "equipe.gerenciar") ? ["/equipe"] : []),
     "/configuracoes",
   ];
-  const theme = await currentTheme();
+  const [theme, platform] = await Promise.all([currentTheme(), isPlatformAdmin()]);
 
   return (
     <div className="flex min-h-screen">
@@ -77,6 +84,15 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
           <p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-subtle">Menu</p>
           <SideNav allowed={allowed} />
         </div>
+
+        {platform && (
+          <Link
+            href="/plataforma"
+            className="mt-4 flex items-center gap-2 rounded-xl border border-brand-500/30 bg-brand-500/10 px-3 py-2.5 text-sm font-medium text-accent-strong transition hover:bg-brand-500/20"
+          >
+            <LayoutGrid className="h-4 w-4" /> Painel da CONNECTA
+          </Link>
+        )}
 
         <div className="mt-auto flex justify-center pb-3">
           <ThemeToggle initial={theme} />
@@ -111,6 +127,11 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
             </div>
             <div className="flex items-center gap-1">
             <ThemeToggle initial={theme} compact />
+            {platform && (
+              <Link href="/plataforma" className="icon-btn" title="Painel da CONNECTA" aria-label="Painel da CONNECTA">
+                <LayoutGrid className="h-4 w-4" />
+              </Link>
+            )}
             <form action="/auth/signout" method="post">
               <button className="icon-btn" aria-label="Sair">
                 <LogOut className="h-4 w-4" />
