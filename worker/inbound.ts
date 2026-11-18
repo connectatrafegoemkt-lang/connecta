@@ -1,4 +1,5 @@
 import type { InboundRepo } from "./repo";
+import type { MediaMeta } from "./media";
 import { isIndividualChat, jidToPhone, phoneCandidates } from "./phone";
 
 /** Subconjunto do WAMessage do Baileys que usamos. */
@@ -50,10 +51,16 @@ export interface StoredInfo {
   fromMe: boolean;
 }
 
+export interface IncomingOptions {
+  onStored?: (info: StoredInfo) => void;
+  /** Baixa e guarda a mídia na pasta do tenant (chamado só se houver mídia). */
+  saveMedia?: (info: { contactId: string; externalId: string }) => Promise<MediaMeta | null>;
+}
+
 export async function handleIncoming(
   repo: InboundRepo,
   msg: IncomingMessage,
-  onStored?: (info: StoredInfo) => void,
+  opts: IncomingOptions = {},
 ): Promise<InboundResult> {
   const id = msg.key.id;
   const jid = msg.key.remoteJid;
@@ -72,6 +79,11 @@ export async function handleIncoming(
     contact = await repo.createContact({ name: name.slice(0, 200), phone });
   }
 
+  let media: MediaMeta | null = null;
+  if (opts.saveMedia && /^\[(imagem|vídeo|áudio|documento|figurinha)\]/.test(body)) {
+    media = await opts.saveMedia({ contactId: contact.id, externalId: id }).catch(() => null);
+  }
+
   const row = await repo.insertInteraction({
     contact_id: contact.id,
     direction: msg.key.fromMe ? "saida" : "entrada",
@@ -79,9 +91,9 @@ export async function handleIncoming(
     external_id: id,
     occurred_at: timestamp(msg.messageTimestamp),
     status: msg.key.fromMe ? "enviado" : "recebido",
-    metadata: { jid },
+    metadata: media ? { jid, media } : { jid },
   });
-  if (row) onStored?.({ contactId: contact.id, fromMe: Boolean(msg.key.fromMe) });
+  if (row) opts.onStored?.({ contactId: contact.id, fromMe: Boolean(msg.key.fromMe) });
   return row ? "stored" : "duplicate";
 }
 

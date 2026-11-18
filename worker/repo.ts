@@ -15,6 +15,10 @@ export interface OutboxItem {
   attempts: number;
   phone: string;
   origin: "humano" | "ia";
+  media_kind: "audio" | "image" | "video" | "document" | null;
+  media_path: string | null;
+  media_mime: string | null;
+  media_filename: string | null;
 }
 
 export interface InboundRepo {
@@ -151,9 +155,10 @@ export class WorkerTenantRepo implements InboundRepo {
   async claimOutbox(limit = 10): Promise<OutboxItem[]> {
     const { data, error } = await this.sb
       .from("whatsapp_outbox")
-      .select("id, contact_id, body, attempts, origin, contacts(phone)")
+      .select("id, contact_id, body, attempts, origin, media_kind, media_path, media_mime, media_filename, contacts(phone)")
       .eq("tenant_id", this.tenantId)
       .eq("status", "pendente")
+      .or(`scheduled_at.is.null,scheduled_at.lte.${new Date().toISOString()}`)
       .order("created_at")
       .limit(limit);
     if (error) throw error;
@@ -164,6 +169,10 @@ export class WorkerTenantRepo implements InboundRepo {
       body: string;
       attempts: number;
       origin: "humano" | "ia";
+      media_kind: OutboxItem["media_kind"];
+      media_path: string | null;
+      media_mime: string | null;
+      media_filename: string | null;
       contacts: { phone: string | null } | null;
     }[]) {
       // trava otimista: só pega se ainda estiver pendente
@@ -187,6 +196,10 @@ export class WorkerTenantRepo implements InboundRepo {
         attempts: row.attempts + 1,
         phone: row.contacts.phone,
         origin: row.origin,
+        media_kind: row.media_kind,
+        media_path: row.media_path,
+        media_mime: row.media_mime,
+        media_filename: row.media_filename,
       });
     }
     return claimed;
@@ -199,6 +212,26 @@ export class WorkerTenantRepo implements InboundRepo {
       .eq("tenant_id", this.tenantId)
       .eq("id", id);
     if (error) throw error;
+  }
+
+  // ---------- mídia (sempre dentro da pasta do tenant) ----------
+  private assertOwnPath(path: string) {
+    if (!path.startsWith(`${this.tenantId}/`) || path.includes("..")) {
+      throw new Error("caminho de mídia fora da pasta do tenant");
+    }
+  }
+
+  async uploadMedia(path: string, data: Buffer, contentType: string) {
+    this.assertOwnPath(path);
+    const { error } = await this.sb.storage.from("tenant-files").upload(path, data, { contentType, upsert: true });
+    if (error) throw error;
+  }
+
+  async downloadMedia(path: string): Promise<Buffer> {
+    this.assertOwnPath(path);
+    const { data, error } = await this.sb.storage.from("tenant-files").download(path);
+    if (error || !data) throw error ?? new Error("arquivo não encontrado");
+    return Buffer.from(await data.arrayBuffer());
   }
 
   // ---------- atendimento por IA ----------

@@ -10,6 +10,9 @@ import {
 } from "@/server/data/whatsapp";
 import { idSchema } from "@/server/validation";
 import { getAiSettings, listPendingSuggestion } from "@/server/data/ai";
+import { listQuickReplies } from "@/server/data/whatsapp-media";
+import { listTags } from "@/server/data/tags";
+import { TagBadge } from "@/components/tag-badge";
 import { isAiPaused } from "@/shared/ai/hours";
 import { ExternalLink, Inbox, MessageCircle, MessageSquareText, Phone } from "lucide-react";
 import { dateTime, phoneFmt } from "@/components/format";
@@ -19,6 +22,7 @@ import { ConnectionPanel } from "./connection-panel";
 import { ChatThread } from "./chat-thread";
 import { LiveRefresh } from "./live-refresh";
 import { AiToggle } from "./ai-toggle";
+import { TagPicker } from "./tag-picker";
 
 export const metadata = { title: "WhatsApp" };
 
@@ -26,13 +30,23 @@ export default async function WhatsappPage({ searchParams }: PageProps<"/whatsap
   const ctx = await getTenantContext();
   const sp = await searchParams;
   const selected = idSchema.safeParse(sp.contato).success ? (sp.contato as string) : null;
+  const tagFilter = idSchema.safeParse(sp.etiqueta).success ? (sp.etiqueta as string) : undefined;
 
-  const [session, qr, conversations, aiSettings] = await Promise.all([
+  const [session, qr, conversations, aiSettings, quickReplies, tags] = await Promise.all([
     getWhatsappSession(ctx),
     getWhatsappQr(ctx),
-    listConversations(ctx),
+    listConversations(ctx, { tagId: tagFilter }),
     getAiSettings(ctx),
+    listQuickReplies(ctx),
+    listTags(ctx),
   ]);
+  const qs = (extra: Record<string, string | undefined>) => {
+    const p = new URLSearchParams();
+    const all = { contato: selected ?? undefined, etiqueta: tagFilter, ...extra };
+    for (const [k, v] of Object.entries(all)) if (v) p.set(k, v);
+    const str = p.toString();
+    return str ? `/whatsapp?${str}` : "/whatsapp";
+  };
 
   let contact = null;
   let thread: Awaited<ReturnType<typeof listThread>> = [];
@@ -67,13 +81,23 @@ export default async function WhatsappPage({ searchParams }: PageProps<"/whatsap
           <h2 className="section-title border-b border-line px-5 py-4">
             <MessageSquareText className="h-4 w-4 text-accent" /> Conversas
           </h2>
+          {tags.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 border-b border-line px-4 py-3">
+              <Link href={qs({ etiqueta: undefined })} className={`chip ${!tagFilter ? "border-brand-500 text-accent-strong" : ""}`}>Todas</Link>
+              {tags.map((t) => (
+                <Link key={t.id} href={qs({ etiqueta: t.id })} className={`chip ${tagFilter === t.id ? "border-brand-500 text-accent-strong" : ""}`}>
+                  <span className="h-2 w-2 rounded-full" style={{ backgroundColor: t.color }} /> {t.name}
+                </Link>
+              ))}
+            </div>
+          )}
           <ul className="max-h-[34rem] flex-1 overflow-y-auto p-2">
             {conversations.map((c) => {
               const active = c.contact_id === contact?.id;
               return (
                 <li key={c.contact_id}>
                   <Link
-                    href={`/whatsapp?contato=${c.contact_id}`}
+                    href={qs({ contato: c.contact_id })}
                     className={`flex items-center gap-3 rounded-xl px-3 py-3 transition ${active ? "bg-brand-500/15 shadow-[inset_0_0_0_1px_rgb(161_0_255/0.35)]" : "hover:bg-surface-2"}`}
                   >
                     <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent-soft text-accent-strong text-xs font-semibold">
@@ -88,6 +112,9 @@ export default async function WhatsappPage({ searchParams }: PageProps<"/whatsap
                         {c.last_direction === "saida" ? "Você: " : ""}
                         {c.last_body}
                       </span>
+                      {c.tags.length > 0 && (
+                        <span className="mt-1 flex flex-wrap gap-1">{c.tags.slice(0, 3).map((t) => <TagBadge key={t.id} {...t} />)}</span>
+                      )}
                     </span>
                   </Link>
                 </li>
@@ -116,7 +143,8 @@ export default async function WhatsappPage({ searchParams }: PageProps<"/whatsap
                     <p className="flex items-center gap-1 text-xs text-muted"><Phone className="h-3 w-3" /> {phoneFmt(contact.phone)}</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-1">
+                <div className="flex flex-wrap items-center justify-end gap-1">
+                  <TagPicker contactId={contact.id} all={tags} selected={contact.tags ?? []} />
                   {aiSettings.mode !== "desligado" && (
                     <AiToggle
                       contactId={contact.id}
@@ -130,7 +158,9 @@ export default async function WhatsappPage({ searchParams }: PageProps<"/whatsap
               </header>
               <ChatThread
                 contactId={contact.id}
-                canSend={session.status === "conectado" && !!contact.phone}
+                canSend={!!contact.phone}
+                connected={session.status === "conectado"}
+                quickReplies={quickReplies}
                 messages={thread}
                 pending={pending}
                 suggestion={suggestion}

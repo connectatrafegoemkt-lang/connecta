@@ -15,6 +15,10 @@ const nextConfig: NextConfig = {
   // Gera um servidor enxuto em .next/standalone para rodar em container (VPS).
   output: "standalone",
   serverExternalPackages: ["@whiskeysockets/baileys", "pg"],
+  experimental: {
+    // envio de áudios/arquivos pelo WhatsApp (limite do app: 20 MB por arquivo)
+    proxyClientMaxBodySize: "25mb",
+  },
   turbopack: {
     rules: {
       "*.css": {

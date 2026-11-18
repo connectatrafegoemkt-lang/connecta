@@ -1,6 +1,7 @@
 import "server-only";
 import { requireAdmin, type TenantContext } from "../context";
 import { badRequest, fromDbError, notFound } from "../errors";
+import { signedUrlsFor } from "./whatsapp-media";
 
 export interface WhatsappSession {
   status: "desconectado" | "aguardando_qr" | "conectando" | "conectado" | "erro";
@@ -62,15 +63,17 @@ export interface Conversation {
   contact_id: string;
   name: string;
   phone: string | null;
+  tags: { id: string; name: string; color: string }[];
   last_at: string;
   last_body: string;
   last_direction: string;
 }
 
 /** Contatos com mensagens de WhatsApp, mais recentes primeiro. */
-export async function listConversations(ctx: TenantContext, limit = 50): Promise<Conversation[]> {
+export async function listConversations(ctx: TenantContext, opts: { limit?: number; tagId?: string } = {}): Promise<Conversation[]> {
+  const limit = opts.limit ?? 50;
   const { data, error } = await ctx.db
-    .select("interactions", "contact_id, body, direction, occurred_at, contacts(name, phone)")
+    .select("interactions", "contact_id, body, direction, occurred_at, contacts(name, phone, contact_tags(tags(id, name, color)))")
     .eq("type", "whatsapp")
     .order("occurred_at", { ascending: false })
     .limit(500);
@@ -81,13 +84,16 @@ export async function listConversations(ctx: TenantContext, limit = 50): Promise
     body: string;
     direction: string;
     occurred_at: string;
-    contacts: { name: string; phone: string | null } | null;
+    contacts: { name: string; phone: string | null; contact_tags?: { tags: { id: string; name: string; color: string } | null }[] } | null;
   }[]) {
     if (seen.has(r.contact_id)) continue;
+    const tags = (r.contacts?.contact_tags ?? []).flatMap((ct) => (ct.tags ? [ct.tags] : []));
+    if (opts.tagId && !tags.some((t) => t.id === opts.tagId)) continue;
     seen.set(r.contact_id, {
       contact_id: r.contact_id,
       name: r.contacts?.name ?? "Contato",
       phone: r.contacts?.phone ?? null,
+      tags,
       last_at: r.occurred_at,
       last_body: r.body,
       last_direction: r.direction,
@@ -103,7 +109,8 @@ export interface ThreadMessage {
   body: string;
   status: string | null;
   occurred_at: string;
-  metadata?: { ai?: boolean } | null;
+  metadata?: { ai?: boolean; media?: { kind: string; path: string; mime: string | null; filename: string | null } } | null;
+  media_url?: string | null;
 }
 
 export async function listThread(ctx: TenantContext, contactId: string): Promise<ThreadMessage[]> {
@@ -114,15 +121,27 @@ export async function listThread(ctx: TenantContext, contactId: string): Promise
     .order("occurred_at", { ascending: true })
     .limit(500);
   if (error) throw fromDbError(error);
-  return data as unknown as ThreadMessage[];
+  const rows = data as unknown as ThreadMessage[];
+  const urls = await signedUrlsFor(ctx, rows.flatMap((r) => (r.metadata?.media?.path ? [r.metadata.media.path] : [])));
+  return rows.map((r) => ({ ...r, media_url: r.metadata?.media?.path ? urls.get(r.metadata.media.path) ?? null : null }));
 }
 
 export async function listPendingOutbox(ctx: TenantContext, contactId: string) {
   const { data, error } = await ctx.db
-    .select("whatsapp_outbox", "id, body, status, error, created_at")
+    .select("whatsapp_outbox", "id, body, status, error, created_at, scheduled_at, media_kind, media_filename")
     .eq("contact_id", contactId)
     .in("status", ["pendente", "enviando", "erro"])
+    .order("scheduled_at", { ascending: true, nullsFirst: true })
     .order("created_at");
   if (error) throw fromDbError(error);
-  return data as unknown as { id: string; body: string; status: string; error: string | null; created_at: string }[];
+  return data as unknown as {
+    id: string;
+    body: string;
+    status: string;
+    error: string | null;
+    created_at: string;
+    scheduled_at: string | null;
+    media_kind: string | null;
+    media_filename: string | null;
+  }[];
 }
