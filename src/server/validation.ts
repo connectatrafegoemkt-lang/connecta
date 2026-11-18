@@ -107,3 +107,14 @@ export const whatsappSendSchema = z.strictObject({
   contact_id: uuid,
   body: z.string().trim().min(1).max(4096),
 });
+
+export const quickReplySchema = z.strictObject({
+  shortcut: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .transform((v) => v.replace(/^\//, ""))
+    .pipe(z.string().regex(/^[a-z0-9][a-z0-9_-]{0,29}$/, "Atalho: só letras minúsculas, números, - e _")),
+  title: z.string().trim().min(1).max(80),
+  body: z.string().trim().min(1).max(4096),
+});
