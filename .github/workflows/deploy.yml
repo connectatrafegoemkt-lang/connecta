@@ -1,0 +1,65 @@
+name: Deploy
+
+# Publica na VPS depois que o CI da main passa (ou manualmente, em Actions).
+# Configuração única na VPS: bash deploy/configurar-deploy-automatico.sh
+# Secrets: VPS_HOST, VPS_KNOWN_HOSTS, VPS_SSH_KEY. Sem eles, o deploy é pulado.
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-producao
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Atualizar sistema.connectatrafego.com.br
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.head_repository.full_name == github.repository)
+    steps:
+      - name: Conferir configuração
+        id: cfg
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          if [ -z "$VPS_HOST" ] || [ -z "$VPS_KNOWN_HOSTS" ] || [ -z "$VPS_SSH_KEY" ]; then
+            echo "::notice::Deploy automático ainda não configurado (faltam os secrets VPS_*). Pulando."
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publicar na VPS
+        if: steps.cfg.outputs.ok == 'true'
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/deploy && chmod 600 ~/.ssh/deploy
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts && chmod 600 ~/.ssh/known_hosts
+          # A chave só consegue rodar /usr/local/bin/connecta-deploy na VPS
+          # (travada no authorized_keys); nenhum comando é enviado daqui.
+          ssh -i ~/.ssh/deploy \
+              -o StrictHostKeyChecking=yes -o UserKnownHostsFile=~/.ssh/known_hosts \
+              -o IdentitiesOnly=yes -o BatchMode=yes -o ServerAliveInterval=30 \
+              "root@${VPS_HOST}"
+
+      - name: Limpar chave
+        if: always()
+        run: rm -f ~/.ssh/deploy

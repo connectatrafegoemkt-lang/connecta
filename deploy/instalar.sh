@@ -5,6 +5,9 @@
 #     bash deploy/instalar.sh
 # Na primeira vez ele pergunta as chaves do Supabase e cria o .env
 # (que fica SÓ neste servidor). Nas próximas, só atualiza e reinicia.
+#
+# NAO_INTERATIVO=1 (usado pelo deploy automático do GitHub): não pergunta
+# nada; exige que o .env já exista.
 # =====================================================================
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -23,6 +26,9 @@ if command -v ufw >/dev/null 2>&1; then
 fi
 
 echo "==> 2/5 Configuração (.env)"
+if [ ! -f .env ] && [ -n "${NAO_INTERATIVO:-}" ]; then
+  echo "   .env não existe: rode 'bash deploy/instalar.sh' uma vez no terminal da VPS."; exit 1
+fi
 if [ ! -f .env ]; then
   read -rp "Endereço do CRM [sistema.connectatrafego.com.br]: " DOMAIN
   DOMAIN=${DOMAIN:-sistema.connectatrafego.com.br}
@@ -46,7 +52,7 @@ else
   echo "   .env já existe, mantendo."
 fi
 # Chave da IA (opcional): pergunta se ainda não estiver no .env
-if ! grep -qE '^OPENAI_API_KEY=.+' .env; then
+if [ -z "${NAO_INTERATIVO:-}" ] && ! grep -qE '^OPENAI_API_KEY=.+' .env; then
   echo "   Atendimento por IA (ChatGPT): cole a chave da OpenAI da CONNECTA (sk-...)."
   read -rsp "   OPENAI_API_KEY (Enter para pular; não aparece ao digitar): " AK; echo
   if [ -n "$AK" ]; then
@@ -62,7 +68,7 @@ for v in CRM_DOMAIN NEXT_PUBLIC_SUPABASE_URL NEXT_PUBLIC_SUPABASE_ANON_KEY SUPAB
 done
 
 echo "==> 3/5 Banco de dados (Supabase)"
-if ! grep -qE '^SUPABASE_DB_URL=.+' .env; then
+if [ -z "${NAO_INTERATIVO:-}" ] && ! grep -qE '^SUPABASE_DB_URL=.+' .env; then
   echo "   Para o banco atualizar sozinho, cole a connection string do Supabase:"
   echo "   Supabase > botão Connect (no topo) > Session pooler > copie o texto que começa com postgresql://"
   read -rp "   Connection string (Enter para pular): " DBURL

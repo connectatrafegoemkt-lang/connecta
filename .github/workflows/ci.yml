@@ -52,6 +52,10 @@ jobs:
       - run: sudo apt-get install -y -q postgresql-client
       - run: scripts/db-reset-local.sh
       - run: npm run test:isolation:db
+      - name: Deploy automático travado (deploy/configurar-deploy-automatico.sh)
+        run: |
+          sudo apt-get install -y -q openssh-server openssh-client
+          sudo bash tests/deploy/deploy-automatico.test.sh
       - name: Atualização automática do banco (deploy/migrar-banco.sh)
         run: bash tests/deploy/migrar-banco.test.sh
         env:

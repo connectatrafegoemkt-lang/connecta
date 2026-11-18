@@ -144,6 +144,31 @@ Supabase.
 > `supabase/migrations/` (PR). Alterações feitas direto no painel do Supabase
 > não voltam para o código.
 
+### Deploy automático (opcional, recomendado)
+
+Com ele, toda novidade mesclada na `main` vai para o ar sozinha, depois que
+todos os testes passam (workflow **Deploy** no GitHub Actions). Configuração
+única:
+
+1. Na VPS:
+
+```bash
+cd /opt/connecta && git pull && bash deploy/configurar-deploy-automatico.sh
+```
+
+2. O script mostra 3 valores. No GitHub: repositório → **Settings** →
+   **Secrets and variables** → **Actions** → **New repository secret**, e crie
+   `VPS_HOST`, `VPS_KNOWN_HOSTS` e `VPS_SSH_KEY` com esses valores.
+3. Teste em **Actions** → **Deploy** → **Run workflow**.
+
+Segurança: a chave do GitHub fica travada no `authorized_keys`
+(`restrict,command=...`): ela só consegue rodar `/usr/local/bin/connecta-deploy`
+(baixar a `main` e rodar `instalar.sh`); não abre terminal, não faz túnel e
+ignora qualquer outro comando. O GitHub confere a identidade da VPS
+(`VPS_KNOWN_HOSTS`) antes de conectar. Para revogar: apague a linha
+`connecta-github-deploy` de `/root/.ssh/authorized_keys`. Para trocar a chave:
+rode o script de novo e atualize o secret `VPS_SSH_KEY`.
+
 ## 8. Atendimento por IA
 
 A IA usa o ChatGPT (OpenAI) com a chave **da CONNECTA** (platform.openai.com → API keys), que paga o uso de
