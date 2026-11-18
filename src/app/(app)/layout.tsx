@@ -25,6 +25,25 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
   try {
     ctx = await getTenantContext();
   } catch (e) {
+    if (e instanceof HttpError && e.status === 423) {
+      return (
+        <main className="flex min-h-screen items-center justify-center p-6 text-center">
+          <div className="card max-w-sm">
+            <LogoMark size={72} className="mx-auto" />
+            <h1 className="mt-4 text-xl font-semibold">Acesso suspenso</h1>
+            <p className="mt-2 text-sm text-muted">
+              O acesso da sua empresa ao CRM está temporariamente suspenso. Seus dados estão preservados.
+              Fale com a CONNECTA para regularizar e reativar.
+            </p>
+            <form action="/auth/signout" method="post" className="mt-5">
+              <button className="btn-secondary w-full">
+                <LogOut className="h-4 w-4" /> Sair
+              </button>
+            </form>
+          </div>
+        </main>
+      );
+    }
     if (e instanceof HttpError && e.status === 403) {
       return (
         <main className="flex min-h-screen items-center justify-center p-6 text-center">

@@ -9,6 +9,7 @@ import { createClient } from "@supabase/supabase-js";
 import pino from "pino";
 import { CredentialCipher } from "./crypto";
 import { listSessionStates, WorkerTenantRepo } from "./repo";
+import { planSession } from "./plan";
 import { TenantSession } from "./session";
 import OpenAI from "openai";
 
@@ -36,7 +37,8 @@ async function tick() {
     const states = await listSessionStates(sb);
     for (const s of states) {
       const running = sessions.get(s.tenant_id);
-      if (s.desired_state === "conectado" && !running) {
+      const action = planSession({ desired: s.desired_state, suspended: s.suspended, running: Boolean(running) });
+      if (action === "start") {
         const session = new TenantSession(
           new WorkerTenantRepo(sb, s.tenant_id),
           cipher,
@@ -49,9 +51,17 @@ async function tick() {
           sessions.delete(s.tenant_id);
           await session.repo.setSession({ status: "erro", last_error: "Falha ao iniciar a sessão" }).catch(() => undefined);
         });
-      } else if (s.desired_state === "desconectado" && running) {
+      } else if (action === "logout" && running) {
         sessions.delete(s.tenant_id);
         await running.stop(true).catch((e) => log.error({ err: e }, "falha ao parar sessão"));
+      } else if (action === "pause" && running) {
+        // cliente suspenso: fecha a conexão SEM apagar o login do WhatsApp
+        sessions.delete(s.tenant_id);
+        log.info({ tenant: s.tenant_id }, "cliente suspenso: sessão pausada");
+        await running.stop(false).catch((e) => log.error({ err: e }, "falha ao pausar sessão"));
+        await running.repo
+          .setSession({ status: "desconectado", last_error: "Cliente suspenso pela CONNECTA" })
+          .catch(() => undefined);
       }
     }
     await Promise.all([...sessions.values()].map((s) => s.flushOutbox().catch((e) => log.error({ err: e, tenant: s.tenantId }, "falha na fila"))));

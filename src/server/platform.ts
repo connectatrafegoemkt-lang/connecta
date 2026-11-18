@@ -3,7 +3,7 @@ import { cache } from "react";
 import { headers } from "next/headers";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { bearerFrom, createUserClient } from "./supabase/user-client";
-import { forbidden, fromDbError, unauthorized } from "./errors";
+import { badRequest, forbidden, fromDbError, notFound, unauthorized } from "./errors";
 
 /**
  * Painel da CONNECTA (administração da plataforma).
@@ -46,6 +46,8 @@ export interface ClientTenant {
   ai_mode: string | null;
   ai_messages_month: number;
   ai_tokens_month: number;
+  suspended_at: string | null;
+  suspended_reason: string | null;
 }
 
 /** Só metadados dos clientes; a autorização é refeita dentro da função do banco. */
@@ -53,6 +55,25 @@ export async function listClientTenants(p: PlatformContext): Promise<ClientTenan
   const { data, error } = await p.supabase.rpc("platform_tenants_overview");
   if (error) throw fromDbError(error);
   return (data as ClientTenant[]).map((t) => ({ ...t, ai_tokens_month: Number(t.ai_tokens_month) }));
+}
+
+/**
+ * Suspende ou reativa um cliente. O id do cliente vem do painel (é a equipe
+ * CONNECTA escolhendo QUAL cliente); a autorização é feita no banco por
+ * platform_set_tenant_suspended (exige administrador da plataforma e impede
+ * suspender a própria empresa).
+ */
+export async function setClientSuspended(p: PlatformContext, tenantId: string, suspend: boolean, reason?: string | null) {
+  const { error } = await p.supabase.rpc("platform_set_tenant_suspended", {
+    p_tenant: tenantId,
+    p_suspend: suspend,
+    p_reason: reason ?? null,
+  });
+  if (error) {
+    if (error.code === "P0002") throw notFound("Cliente não encontrado");
+    if (error.code === "42501" && /própria/.test(error.message)) throw badRequest("Você não pode suspender a empresa da sua própria conta.");
+    throw fromDbError(error);
+  }
 }
 
 export { createClientTenant } from "./admin/platform-admin";

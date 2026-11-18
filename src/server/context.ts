@@ -4,7 +4,7 @@ import { headers } from "next/headers";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { bearerFrom, createUserClient } from "./supabase/user-client";
 import { TenantDb } from "./data/tenant-db";
-import { forbidden, unauthorized } from "./errors";
+import { forbidden, HttpError, unauthorized } from "./errors";
 import type { Permission, Profile } from "@/shared/permissions";
 
 export type TenantRole = "admin" | "atendente";
@@ -40,6 +40,11 @@ export const getTenantContext = cache(async (): Promise<TenantContext> => {
   if (!row) {
     // Autenticado, mas sem vínculo com nenhum tenant.
     throw forbidden("Usuário sem acesso a nenhum tenant");
+  }
+  if (row.suspended) {
+    // Cliente suspenso pela CONNECTA: o banco já nega todos os dados (RLS);
+    // aqui só damos uma resposta clara para a tela/API.
+    throw new HttpError(423, "Acesso suspenso. Fale com a CONNECTA.");
   }
   return {
     userId: row.user_id,

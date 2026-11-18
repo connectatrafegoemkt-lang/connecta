@@ -318,9 +318,20 @@ export class WorkerTenantRepo implements InboundRepo {
   }
 }
 
-/** Única leitura entre tenants do worker: quais sessões devem estar ativas. */
+/** Única leitura entre tenants do worker: quais sessões devem estar ativas (e se o cliente está suspenso). */
 export async function listSessionStates(sb: SupabaseClient) {
-  const { data, error } = await sb.from("whatsapp_sessions").select("tenant_id, desired_state, status");
+  const { data, error } = await sb
+    .from("whatsapp_sessions")
+    .select("tenant_id, desired_state, status, tenants(suspended_at)");
   if (error) throw error;
-  return (data ?? []) as { tenant_id: string; desired_state: "conectado" | "desconectado"; status: string }[];
+  type Row = {
+    tenant_id: string;
+    desired_state: "conectado" | "desconectado";
+    status: string;
+    tenants: { suspended_at: string | null } | { suspended_at: string | null }[] | null;
+  };
+  return ((data ?? []) as unknown as Row[]).map((r) => {
+    const t = Array.isArray(r.tenants) ? r.tenants[0] : r.tenants;
+    return { tenant_id: r.tenant_id, desired_state: r.desired_state, status: r.status, suspended: Boolean(t?.suspended_at) };
+  });
 }

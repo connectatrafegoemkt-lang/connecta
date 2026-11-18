@@ -15,6 +15,10 @@ fresh() {
 migrar() { DATABASE_URL="$URL" bash deploy/migrar-banco.sh; }
 count() { psql "$URL" -At -c "select count(*) from supabase_migrations.schema_migrations"; }
 total=$(ls supabase/migrations/*.sql | wc -l)
+# Migrations da época em que o banco era atualizado à mão pelo SQL Editor
+# (as que deploy/migrar-banco.sh reconhece na primeira execução). As
+# posteriores são sempre aplicadas pelo próprio script.
+BASELINE=8
 # pg_dump 16 contra servidor 17 escreve "pg_attver=<número>" variável: não é esquema, é ruído.
 schema() { pg_dump -s --no-owner "$URL" | grep -v '^\\\|^--' | grep -v 'supabase_migrations' | grep -v 'pg_attver=' | sort; }
 
@@ -29,19 +33,19 @@ echo "== 2. rodar de novo: nada muda"
 out=$(migrar); echo "$out"
 echo "$out" | grep -q "já estava atualizado" || fail "segunda execução deveria ser no-op"
 
-echo "== 3. banco antigo, migrations rodadas à mão (como em produção): só registra"
+echo "== 3. banco antigo, migrations rodadas à mão (como em produção): registra as antigas e aplica as novas"
 fresh
-for f in supabase/migrations/*.sql; do psql "$URL" -q -v ON_ERROR_STOP=1 -f "$f" >/dev/null || fail "aplicar $f"; done
+for f in $(ls supabase/migrations/*.sql | head -n $BASELINE); do psql "$URL" -q -v ON_ERROR_STOP=1 -f "$f" >/dev/null || fail "aplicar $f"; done
 out=$(migrar); echo "$out"
-echo "$out" | grep -q "0 aplicada(s), $total registrada(s)" || fail "deveria só registrar"
+echo "$out" | grep -q "$((total - BASELINE)) aplicada(s), $BASELINE registrada(s)" || fail "deveria registrar $BASELINE e aplicar $((total - BASELINE))"
 check_schema() { if ! diff <(schema) /tmp/ref-migrar.sql > /tmp/diff-migrar.txt; then head -40 /tmp/diff-migrar.txt >&2; fail "esquema diferente"; fi; }
 check_schema
 
-echo "== 4. banco antigo sem a última migration: registra as antigas e aplica a nova"
+echo "== 4. banco antigo sem a última migration manual: registra as anteriores e aplica o resto"
 fresh
-for f in $(ls supabase/migrations/*.sql | head -n $((total - 1))); do psql "$URL" -q -v ON_ERROR_STOP=1 -f "$f" >/dev/null || fail "aplicar $f"; done
+for f in $(ls supabase/migrations/*.sql | head -n $((BASELINE - 1))); do psql "$URL" -q -v ON_ERROR_STOP=1 -f "$f" >/dev/null || fail "aplicar $f"; done
 out=$(migrar); echo "$out"
-echo "$out" | grep -q "1 aplicada(s), $((total - 1)) registrada(s)" || fail "deveria aplicar só a nova"
+echo "$out" | grep -q "$((total - BASELINE + 1)) aplicada(s), $((BASELINE - 1)) registrada(s)" || fail "deveria aplicar as que faltam"
 check_schema
 
 echo "== 5. migration com erro: nada fica pela metade"

@@ -43,6 +43,11 @@ Realtime), Tailwind CSS.
    METADADOS de todos os clientes via `public.platform_tenants_overview()`
    (SECURITY DEFINER, exige `public.is_platform_admin()`, lista em
    `app.platform_admins`). Nunca expor contatos/conversas/dados de negócio ali.
+   Suspensão de cliente (`tenants.suspended_at`, via
+   `public.platform_set_tenant_suspended()`): `app.current_tenant_id()` devolve
+   NULL para usuários do cliente suspenso, então todo RLS nega; o worker pausa
+   a sessão (`worker/plan.ts`). Novas funções/policies devem depender de
+   `app.current_tenant_id()` para herdar esse bloqueio.
 6. Storage: bucket privado `tenant-files`, caminho `<tenant_id>/...`, policies
    comparando o primeiro segmento do caminho com o tenant do usuário.
 7. Perfis por tenant (`memberships.profile`: admin, gerente, atendente,
