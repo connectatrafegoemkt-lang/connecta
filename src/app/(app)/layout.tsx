@@ -43,17 +43,17 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
 
   return (
     <div className="flex min-h-screen">
-      <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-r border-line bg-surface/70 px-4 py-6 backdrop-blur-xl md:flex">
+      <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-r border-line bg-surface px-4 py-6 md:flex">
         <div className="flex items-center gap-2.5 px-2">
-          <LogoMark size={44} />
+          <LogoMark size={40} />
           <div className="leading-tight">
             <Wordmark className="text-sm" />
-            <p className="text-[10px] font-medium uppercase tracking-[0.3em] text-brand-300">CRM</p>
+            <p className="text-[10px] font-medium uppercase tracking-[0.3em] text-brand-600">CRM</p>
           </div>
         </div>
 
         <div className="mt-6 flex items-center gap-2 rounded-xl border border-line bg-surface-2/70 px-3 py-2.5">
-          <Building2 className="h-4 w-4 shrink-0 text-brand-300" />
+          <Building2 className="h-4 w-4 shrink-0 text-brand-600" />
           <span className="truncate text-sm font-medium" title={ctx.tenantName}>
             {ctx.tenantName}
           </span>
@@ -72,7 +72,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-medium">{ctx.displayName ?? "Usuário"}</p>
               <p className="flex items-center gap-1 text-xs text-muted">
-                {isAdmin ? <ShieldCheck className="h-3 w-3 text-brand-300" /> : <UserRound className="h-3 w-3" />}
+                {isAdmin ? <ShieldCheck className="h-3 w-3 text-brand-600" /> : <UserRound className="h-3 w-3" />}
                 {isAdmin ? "Administrador" : "Atendente"}
               </p>
             </div>

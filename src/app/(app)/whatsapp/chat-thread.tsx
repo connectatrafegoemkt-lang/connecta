@@ -34,7 +34,7 @@ export function ChatThread({
         className="flex-1 space-y-2 overflow-y-auto px-5 py-5"
         style={{
           maxHeight: "30rem",
-          backgroundImage: "radial-gradient(rgb(161 0 255 / 0.07) 1px, transparent 1px)",
+          backgroundImage: "radial-gradient(rgb(161 0 255 / 0.10) 1px, transparent 1px)",
           backgroundSize: "18px 18px",
         }}
       >
@@ -43,10 +43,10 @@ export function ChatThread({
           return (
             <div key={m.id} className={`flex ${out ? "justify-end" : "justify-start"}`}>
               <div
-                className={`max-w-[75%] rounded-2xl px-4 py-2.5 text-sm shadow-lg ${
+                className={`max-w-[75%] rounded-2xl px-4 py-2.5 text-sm shadow-sm ${
                   out
                     ? "rounded-br-md bg-gradient-to-br from-brand-500 to-brand-700 text-white"
-                    : "rounded-bl-md border border-line bg-surface-2 text-fg"
+                    : "rounded-bl-md border border-line bg-surface text-fg"
                 }`}
               >
                 <p className="whitespace-pre-wrap break-words">{m.body}</p>
@@ -59,9 +59,9 @@ export function ChatThread({
         })}
         {pending.map((p) => (
           <div key={p.id} className="flex justify-end">
-            <div className="max-w-[75%] rounded-2xl rounded-br-md border border-brand-500/40 bg-brand-500/15 px-4 py-2.5 text-sm text-brand-50">
+            <div className="max-w-[75%] rounded-2xl rounded-br-md border border-brand-500/40 bg-brand-50 px-4 py-2.5 text-sm text-brand-900">
               <p className="whitespace-pre-wrap break-words">{p.body}</p>
-              <p className="mt-1 flex items-center justify-end gap-1 text-[10px] text-brand-200/80">
+              <p className="mt-1 flex items-center justify-end gap-1 text-[10px] text-brand-700">
                 {p.status === "erro" ? (
                   <><TriangleAlert className="h-3 w-3 text-danger" /> Falhou: {p.error ?? ""}</>
                 ) : (
@@ -76,7 +76,7 @@ export function ChatThread({
         )}
         <div ref={end} />
       </div>
-      <div className="border-t border-line bg-surface/60 p-3">
+      <div className="border-t border-line bg-surface p-3">
         {canSend ? (
           <ActionForm action={whatsappSendAction} resetOnSuccess className="flex items-center gap-2" submitLabel="Enviar" submitIcon={<Send className="h-4 w-4" />}>
             <input type="hidden" name="contact_id" value={contactId} />

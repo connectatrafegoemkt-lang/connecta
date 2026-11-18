@@ -32,8 +32,8 @@ export default async function ContatosPage({ searchParams }: PageProps<"/contato
       <PageHeader icon={Users} title="Contatos" subtitle={`${total} contato${total === 1 ? "" : "s"} na sua base`} />
 
       <details className="card group">
-        <summary className="flex cursor-pointer list-none items-center gap-2 font-medium text-brand-200 marker:hidden">
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-500/15 text-brand-300 transition group-open:rotate-45">
+        <summary className="flex cursor-pointer list-none items-center gap-2 font-medium text-brand-700 marker:hidden">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-500/15 text-brand-600 transition group-open:rotate-45">
             <Plus className="h-4 w-4" />
           </span>
           Novo contato
@@ -105,11 +105,11 @@ export default async function ContatosPage({ searchParams }: PageProps<"/contato
                     <tr key={c.id} className="transition hover:bg-surface-2/60">
                       <td className="px-5 py-3">
                         <Link href={`/contatos/${c.id}`} className="flex items-center gap-3">
-                          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-brand-500/40 to-brand-800/60 text-xs font-semibold text-brand-50">
+                          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-100 text-brand-700 text-xs font-semibold">
                             {initials(c.name)}
                           </span>
                           <span>
-                            <span className="block font-medium text-fg hover:text-brand-200">{c.name}</span>
+                            <span className="block font-medium text-fg hover:text-brand-700">{c.name}</span>
                             {c.company && <span className="block text-xs text-muted">{c.company}</span>}
                           </span>
                         </Link>

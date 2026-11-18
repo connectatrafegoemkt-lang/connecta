@@ -77,7 +77,7 @@ export default async function ContatoPage({ params }: PageProps<"/contatos/[id]"
         <ArrowLeft className="h-4 w-4" /> Contatos
       </Link>
 
-      <div className="card flex flex-wrap items-center justify-between gap-4 bg-gradient-to-r from-brand-500/10 via-surface/80 to-surface/80">
+      <div className="card flex flex-wrap items-center justify-between gap-4 bg-gradient-to-r from-brand-50 via-surface to-surface">
         <div className="flex items-center gap-4">
           <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-400 to-brand-700 text-lg font-semibold text-white shadow-[0_8px_24px_-8px_rgb(161_0_255/0.8)]">
             {initials}
@@ -135,7 +135,7 @@ export default async function ContatoPage({ params }: PageProps<"/contatos/[id]"
                     <input type="checkbox" name="tag_ids[]" value={t.id} defaultChecked={tagSet.has(t.id)} className="peer sr-only" />
                     <span
                       className="inline-flex items-center gap-1 rounded-full border border-line px-2.5 py-1 text-xs text-muted transition peer-checked:border-current peer-checked:text-[var(--tag)] peer-focus-visible:ring-2 peer-focus-visible:ring-brand-500/40"
-                      style={{ ["--tag" as string]: t.color }}
+                      style={{ ["--tag" as string]: `color-mix(in oklab, ${t.color} 72%, black)` }}
                     >
                       <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: t.color }} />
                       {t.name}
@@ -155,7 +155,7 @@ export default async function ContatoPage({ params }: PageProps<"/contatos/[id]"
 
         <section className="space-y-6 lg:col-span-2">
           <div className="card">
-            <h2 className="section-title"><Plus className="h-4 w-4 text-brand-300" /> Registrar interação</h2>
+            <h2 className="section-title"><Plus className="h-4 w-4 text-brand-600" /> Registrar interação</h2>
             <ActionForm action={createInteractionAction} resetOnSuccess className="mt-4 grid gap-3 md:grid-cols-3" submitLabel="Registrar" submitClassName="btn-primary md:col-start-3">
               <input type="hidden" name="contact_id" value={contact.id} />
               <label><span className="label">Tipo</span>
@@ -179,7 +179,7 @@ export default async function ContatoPage({ params }: PageProps<"/contatos/[id]"
           </div>
 
           <div className="card">
-            <h2 className="section-title"><History className="h-4 w-4 text-brand-300" /> Histórico</h2>
+            <h2 className="section-title"><History className="h-4 w-4 text-brand-600" /> Histórico</h2>
             <LiveTimeline contactId={contact.id} />
             {interactions.length === 0 ? (
               <EmptyState icon={History} title="Nenhuma interação registrada" />
@@ -189,7 +189,7 @@ export default async function ContatoPage({ params }: PageProps<"/contatos/[id]"
                   const Icon = TYPE_ICON[i.type] ?? StickyNote;
                   return (
                     <li key={i.id} className="relative flex gap-4">
-                      <span className={`relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border ${i.type === "whatsapp" ? "border-success/40 bg-success/10 text-success" : "border-brand-500/40 bg-surface-2 text-brand-300"}`}>
+                      <span className={`relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border ${i.type === "whatsapp" ? "border-success/40 bg-success/10 text-success" : "border-brand-500/40 bg-surface-2 text-brand-600"}`}>
                         <Icon className="h-4 w-4" />
                       </span>
                       <div className="min-w-0 flex-1 rounded-xl border border-line bg-surface-2/50 px-4 py-3">
@@ -216,7 +216,7 @@ export default async function ContatoPage({ params }: PageProps<"/contatos/[id]"
           </div>
 
           <div className="card">
-            <h2 className="section-title"><ListTodo className="h-4 w-4 text-brand-300" /> Tarefas</h2>
+            <h2 className="section-title"><ListTodo className="h-4 w-4 text-brand-600" /> Tarefas</h2>
             {tasks.length > 0 && (
               <ul className="mt-3 divide-y divide-line">
                 {tasks.map((t) => (

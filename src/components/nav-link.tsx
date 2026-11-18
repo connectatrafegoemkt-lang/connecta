@@ -39,7 +39,7 @@ export function SideNavLink({ href, label, icon: Icon }: (typeof NAV)[number]) {
       }`}
     >
       {active && <span className="absolute inset-y-2 left-0 w-1 rounded-full bg-brand-500 shadow-[0_0_12px_rgb(161_0_255)]" />}
-      <Icon className={`h-[18px] w-[18px] ${active ? "text-brand-300" : "text-subtle group-hover:text-brand-300"}`} />
+      <Icon className={`h-[18px] w-[18px] ${active ? "text-brand-600" : "text-subtle group-hover:text-brand-600"}`} />
       {label}
     </Link>
   );
@@ -51,7 +51,7 @@ export function MobileNavLink({ href, label, icon: Icon }: (typeof NAV)[number])
     <Link
       href={href}
       className={`flex shrink-0 flex-col items-center gap-1 rounded-xl px-3 py-2 text-[11px] font-medium ${
-        active ? "bg-brand-500/15 text-brand-200" : "text-muted"
+        active ? "bg-brand-500/15 text-brand-700" : "text-muted"
       }`}
     >
       <Icon className="h-5 w-5" />

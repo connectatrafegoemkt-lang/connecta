@@ -20,7 +20,7 @@ export function StageOrder({ stages }: { stages: { id: string; name: string; col
 
   return (
     <div className="rounded-xl border border-line bg-surface-2/40 p-4">
-      <p className="flex items-center gap-2 text-sm font-medium"><ArrowDownUp className="h-4 w-4 text-brand-300" /> Ordem das etapas</p>
+      <p className="flex items-center gap-2 text-sm font-medium"><ArrowDownUp className="h-4 w-4 text-brand-600" /> Ordem das etapas</p>
       <ol className="mt-3 space-y-1">
         {order.map((s, i) => (
           <li key={s.id} className="flex items-center gap-2 rounded-lg px-2 py-1 text-sm hover:bg-surface-2">

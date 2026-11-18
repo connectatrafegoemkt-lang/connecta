@@ -1,5 +1,5 @@
 import { MessageCircle, ShieldCheck, SquareKanban } from "lucide-react";
-import { LogoMark, Wordmark } from "@/components/logo";
+import { LogoArt, LogoMark, Wordmark } from "@/components/logo";
 import { LoginForm } from "./login-form";
 
 export const metadata = { title: "Entrar" };
@@ -12,22 +12,24 @@ const FEATURES = [
 
 export default function LoginPage() {
   return (
-    <main className="relative grid min-h-screen lg:grid-cols-2">
-      <section className="relative hidden overflow-hidden border-r border-line lg:flex lg:flex-col lg:justify-between lg:p-12">
-        <div className="pointer-events-none absolute -left-40 top-1/3 h-[32rem] w-[32rem] rounded-full bg-brand-500/25 blur-[120px]" />
+    <main className="grid min-h-screen gap-6 p-4 lg:grid-cols-2 lg:p-6">
+      {/* Painel da marca: a arte original do logo é sobre preto */}
+      <section className="relative hidden overflow-hidden rounded-3xl bg-[#07060b] p-12 text-white lg:flex lg:flex-col lg:justify-between">
+        <div className="pointer-events-none absolute -left-32 top-1/3 h-[30rem] w-[30rem] rounded-full bg-brand-500/30 blur-[120px]" />
+        <div className="pointer-events-none absolute -bottom-24 -right-24 h-72 w-72 rounded-full bg-brand-500/20 blur-[100px]" />
         <div className="relative flex items-center gap-3">
-          <LogoMark size={56} />
-          <Wordmark className="text-lg" />
+          <LogoArt width={64} />
+          <span className="font-semibold tracking-[0.22em]">CONNECTA</span>
         </div>
         <div className="relative">
-          <LogoMark size={340} className="-ml-4 opacity-95" />
+          <LogoArt width={320} className="-ml-3" />
           <h2 className="mt-8 max-w-md text-4xl font-semibold leading-tight tracking-tight">
-            <span className="text-gradient">Relacionamento que conecta</span> e converte.
+            <span className="bg-gradient-to-r from-white via-brand-200 to-brand-400 bg-clip-text text-transparent">Relacionamento que conecta</span> e converte.
           </h2>
           <ul className="mt-8 space-y-3">
             {FEATURES.map(({ icon: Icon, text }) => (
-              <li key={text} className="flex items-center gap-3 text-sm text-muted">
-                <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-brand-500/30 bg-brand-500/10 text-brand-300">
+              <li key={text} className="flex items-center gap-3 text-sm text-white/70">
+                <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-brand-400/30 bg-brand-500/15 text-brand-300">
                   <Icon className="h-4 w-4" />
                 </span>
                 {text}
@@ -35,14 +37,14 @@ export default function LoginPage() {
             ))}
           </ul>
         </div>
-        <p className="relative text-xs text-subtle">© CONNECTA · Tráfego e Marketing</p>
+        <p className="relative text-xs text-white/40">© CONNECTA · Tráfego e Marketing</p>
       </section>
 
-      <section className="flex items-center justify-center px-5 py-12">
+      <section className="flex items-center justify-center px-2 py-10">
         <div className="w-full max-w-sm">
           <div className="mb-8 flex flex-col items-center text-center lg:hidden">
-            <LogoMark size={120} />
-            <Wordmark className="mt-2 text-base" />
+            <LogoMark size={84} />
+            <Wordmark className="mt-3 text-base" />
           </div>
           <div className="card p-8">
             <h1 className="text-2xl font-semibold tracking-tight">Bem-vindo de volta</h1>

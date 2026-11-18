@@ -74,7 +74,7 @@ export function KanbanBoard({ stages, contacts }: { stages: Stage[]; contacts: C
                 e.preventDefault();
                 drop(s.id, column.length);
               }}
-              className={`flex w-72 shrink-0 flex-col rounded-2xl border bg-surface/70 p-3 backdrop-blur transition ${
+              className={`flex w-72 shrink-0 flex-col rounded-2xl border bg-surface-2/70 p-3 transition ${
                 over === s.id ? "border-brand-500/60 shadow-[0_0_0_1px_rgb(161_0_255/0.3),0_0_32px_-8px_rgb(161_0_255/0.6)]" : "border-line"
               }`}
             >
@@ -83,7 +83,7 @@ export function KanbanBoard({ stages, contacts }: { stages: Stage[]; contacts: C
                 <h2 className="flex items-center gap-2 text-sm font-semibold">
                   {s.is_won ? <Trophy className="h-4 w-4 text-success" /> : s.is_lost ? <Ban className="h-4 w-4 text-danger" /> : <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: s.color }} />}
                   {s.name}
-                  <span className="rounded-full bg-surface-2 px-2 py-0.5 text-[11px] font-medium text-muted">{column.length}</span>
+                  <span className="rounded-full bg-surface px-2 py-0.5 text-[11px] font-medium text-muted">{column.length}</span>
                 </h2>
                 <span className="text-xs tabular-nums text-muted">{brl(total)}</span>
               </header>
@@ -99,10 +99,10 @@ export function KanbanBoard({ stages, contacts }: { stages: Stage[]; contacts: C
                       e.stopPropagation();
                       drop(s.id, idx);
                     }}
-                    className={`group cursor-grab rounded-xl border border-line bg-surface-2 p-3 transition hover:border-brand-500/40 hover:bg-elevated active:cursor-grabbing ${dragging === c.id ? "opacity-40" : ""}`}
+                    className={`group cursor-grab rounded-xl border border-line bg-surface p-3 shadow-sm transition hover:border-brand-500/40 hover:shadow-md active:cursor-grabbing ${dragging === c.id ? "opacity-40" : ""}`}
                   >
                     <div className="flex items-start justify-between gap-2">
-                      <Link href={`/contatos/${c.id}`} className="text-sm font-medium text-fg hover:text-brand-200">
+                      <Link href={`/contatos/${c.id}`} className="text-sm font-medium text-fg hover:text-brand-700">
                         {c.name}
                       </Link>
                       <GripVertical className="h-4 w-4 shrink-0 text-subtle opacity-0 transition group-hover:opacity-100" />
@@ -119,7 +119,7 @@ export function KanbanBoard({ stages, contacts }: { stages: Stage[]; contacts: C
                             <TagBadge key={t.id} {...t} />
                           ))}
                         </div>
-                        {c.value_cents > 0 && <span className="text-xs font-medium tabular-nums text-brand-200">{brl(c.value_cents)}</span>}
+                        {c.value_cents > 0 && <span className="text-xs font-medium tabular-nums text-brand-700">{brl(c.value_cents)}</span>}
                       </div>
                     )}
                   </li>

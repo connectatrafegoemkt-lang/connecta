@@ -28,7 +28,7 @@ function Stat({ icon: Icon, label, value, hint, tone = "brand" }: { icon: Lucide
       <div className="pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full bg-brand-500/10 blur-2xl" />
       <div className="flex items-center justify-between">
         <p className="text-xs font-medium uppercase tracking-wider text-muted">{label}</p>
-        <span className={`flex h-9 w-9 items-center justify-center rounded-xl border ${tone === "warning" ? "border-warning/30 bg-warning/10 text-warning" : "border-brand-500/30 bg-brand-500/10 text-brand-300"}`}>
+        <span className={`flex h-9 w-9 items-center justify-center rounded-xl border ${tone === "warning" ? "border-warning/30 bg-warning/10 text-warning" : "border-brand-500/30 bg-brand-500/10 text-brand-600"}`}>
           <Icon className="h-[18px] w-[18px]" />
         </span>
       </div>
@@ -135,7 +135,7 @@ export default async function DashboardPage() {
               {recent.map((i) => (
                 <li key={i.id}>
                   <Link href={`/contatos/${i.contact_id}`} className="flex gap-3 rounded-xl px-2 py-2 transition hover:bg-surface-2">
-                    <span className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${i.type === "whatsapp" ? "bg-success/10 text-success" : "bg-brand-500/10 text-brand-300"}`}>
+                    <span className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${i.type === "whatsapp" ? "bg-success/10 text-success" : "bg-brand-500/10 text-brand-600"}`}>
                       {i.type === "whatsapp" ? <MessageCircle className="h-4 w-4" /> : <Activity className="h-4 w-4" />}
                     </span>
                     <span className="min-w-0 flex-1">
