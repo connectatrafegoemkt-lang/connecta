@@ -2,6 +2,7 @@ import "server-only";
 import type { NextRequest } from "next/server";
 import { z } from "zod";
 import { getTenantContext, type TenantContext } from "./context";
+import { getPlatformContext, type PlatformContext } from "./platform";
 import { badRequest, HttpError } from "./errors";
 
 const FORBIDDEN_KEYS = ["tenant_id", "tenantid", "tenant"];
@@ -74,6 +75,22 @@ export function withTenant<P = Record<string, never>>(fn: Handler<P>) {
       const ctx = await getTenantContext();
       const params = (await route?.params) ?? ({} as P);
       const out = await fn(req, ctx, params);
+      if (out instanceof Response) return out;
+      if (out === undefined) return new Response(null, { status: 204 });
+      return Response.json(out);
+    } catch (e) {
+      return errorResponse(e);
+    }
+  };
+}
+
+/** Igual a withTenant, mas para o painel da CONNECTA (administradores da plataforma). */
+export function withPlatform(fn: (req: NextRequest, p: PlatformContext) => Promise<unknown>) {
+  return async (req: NextRequest) => {
+    try {
+      assertNoClientTenant(req);
+      const p = await getPlatformContext();
+      const out = await fn(req, p);
       if (out instanceof Response) return out;
       if (out === undefined) return new Response(null, { status: 204 });
       return Response.json(out);

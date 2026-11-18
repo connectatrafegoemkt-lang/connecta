@@ -135,3 +135,17 @@ export const quickReplySchema = z.strictObject({
   title: z.string().trim().min(1).max(80),
   body: z.string().trim().min(1).max(4096),
 });
+
+// Painel da CONNECTA: novo cliente + administrador dele
+export const platformTenantCreateSchema = z.strictObject({
+  name: z.string().trim().min(2).max(120),
+  slug: z
+    .string()
+    .trim()
+    .regex(/^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/, "use letras minúsculas, números e hífen")
+    .optional()
+    .or(z.literal("").transform(() => undefined)),
+  admin_email: z.email(),
+  admin_password: z.string().min(10).max(200),
+  admin_name: z.string().trim().min(1).max(100),
+});
