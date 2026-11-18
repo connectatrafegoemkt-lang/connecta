@@ -40,7 +40,12 @@ Realtime), Tailwind CSS.
    tenant via HKDF + AAD) e não tem policy para usuários.
 6. Storage: bucket privado `tenant-files`, caminho `<tenant_id>/...`, policies
    comparando o primeiro segmento do caminho com o tenant do usuário.
-7. Roles por tenant: `admin` e `atendente` (tabela `memberships`).
+7. Perfis por tenant (`memberships.profile`: admin, gerente, atendente,
+   leitura) + `memberships.permissions` (catálogo em `app.permission_catalog()`,
+   espelhado em `src/shared/permissions.ts`). Toda checagem usa
+   `app.has_perm()` no banco e `requirePerm()`/`can()` no app. Setores
+   (`departments`, `member_departments`) limitam a visibilidade de contatos
+   via `app.can_see_department()`/`app.can_see_contact()`.
 8. Auditoria: tabela `audit_logs` com `tenant_id` e `user_id`, preenchida por
    triggers (não depende do app lembrar de registrar).
 9. Testes de isolamento (`tests/isolation/`) rodam em todo PR. Qualquer nova
