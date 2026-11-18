@@ -11,7 +11,7 @@ cd "$(dirname "$0")/.."
 
 if [ "$(id -u)" -ne 0 ]; then echo "Rode como root (sudo bash deploy/instalar.sh)"; exit 1; fi
 
-echo "==> 1/4 Instalando Docker e firewall (se necessário)"
+echo "==> 1/5 Instalando Docker e firewall (se necessário)"
 if ! command -v docker >/dev/null 2>&1 || ! docker compose version >/dev/null 2>&1; then
   apt-get update -q
   DEBIAN_FRONTEND=noninteractive apt-get install -y -q docker.io docker-compose-v2 ufw
@@ -22,7 +22,7 @@ if command -v ufw >/dev/null 2>&1; then
   ufw --force enable >/dev/null
 fi
 
-echo "==> 2/4 Configuração (.env)"
+echo "==> 2/5 Configuração (.env)"
 if [ ! -f .env ]; then
   read -rp "Endereço do CRM [sistema.connectatrafego.com.br]: " DOMAIN
   DOMAIN=${DOMAIN:-sistema.connectatrafego.com.br}
@@ -61,11 +61,37 @@ for v in CRM_DOMAIN NEXT_PUBLIC_SUPABASE_URL NEXT_PUBLIC_SUPABASE_ANON_KEY SUPAB
   if ! grep -qE "^${v}=.+" .env; then echo "Faltando ${v} no .env"; exit 1; fi
 done
 
-echo "==> 3/4 Construindo e subindo (app + worker + HTTPS). Pode levar alguns minutos..."
+echo "==> 3/5 Banco de dados (Supabase)"
+if ! grep -qE '^SUPABASE_DB_URL=.+' .env; then
+  echo "   Para o banco atualizar sozinho, cole a connection string do Supabase:"
+  echo "   Supabase > botão Connect (no topo) > Session pooler > copie o texto que começa com postgresql://"
+  read -rp "   Connection string (Enter para pular): " DBURL
+  if [ -n "$DBURL" ]; then
+    # tira a senha / [YOUR-PASSWORD] do endereço; a senha fica numa linha separada
+    DBURL=$(printf '%s' "$DBURL" | sed -E 's#^(postgres(ql)?://[^:@/]+):[^@]*@#\1@#')
+    read -rsp "   Senha do banco (Database password; não aparece ao digitar): " DBPASS; echo
+    sed -i '/^SUPABASE_DB_URL=/d;/^SUPABASE_DB_PASSWORD=/d' .env
+    printf 'SUPABASE_DB_URL=%s\nSUPABASE_DB_PASSWORD=%s\n' "$DBURL" "$DBPASS" >> .env
+    echo "   conexão do banco salva no .env"
+  fi
+fi
+if grep -qE '^SUPABASE_DB_URL=.+' .env; then
+  if ! bash deploy/migrar-banco.sh; then
+    echo
+    echo "   A atualização do banco falhou (o sistema NÃO foi atualizado, continua como estava)."
+    echo "   Se for senha/endereço errado: apague as linhas SUPABASE_DB_URL e SUPABASE_DB_PASSWORD"
+    echo "   do .env e rode este script de novo. Se não, mande o erro acima para o suporte."
+    exit 1
+  fi
+else
+  echo "   sem conexão do banco configurada: aplique as atualizações de banco pelo SQL Editor"
+fi
+
+echo "==> 4/5 Construindo e subindo (app + worker + HTTPS). Pode levar alguns minutos..."
 docker compose up -d --build
 docker image prune -f >/dev/null
 
-echo "==> 4/4 Situação"
+echo "==> 5/5 Situação"
 docker compose ps
 DOMAIN=$(grep -E '^CRM_DOMAIN=' .env | cut -d= -f2)
 echo
