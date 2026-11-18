@@ -113,18 +113,36 @@ cd /opt/connecta && docker compose run --rm worker npx tsx scripts/create-tenant
 
 ## 7. Atualizar o sistema
 
-Sempre que uma novidade for mesclada na `main` do GitHub:
-
-1. **Se a atualização trouxer mudança no banco** (arquivo novo em `supabase/migrations/`), rode
-   esse arquivo no Supabase: SQL Editor → New query → colar → **Run**. A CONNECTA avisa quando
-   for o caso e manda o arquivo.
-2. Na VPS:
+Sempre que uma novidade for mesclada na `main` do GitHub, na VPS:
 
 ```bash
 cd /opt/connecta && git pull && bash deploy/instalar.sh
 ```
 
-3. No navegador, recarregue com **Ctrl + Shift + R**.
+Esse comando atualiza **o sistema e o banco** (Supabase) juntos: ele aplica
+sozinho as mudanças de banco que faltarem (`deploy/migrar-banco.sh`). Cada
+mudança entra inteira ou não entra; se o banco falhar, o sistema não é
+atualizado e continua como estava. No final, recarregue o navegador com
+**Ctrl + Shift + R**.
+
+### Configurar a atualização automática do banco (uma vez)
+
+Na primeira vez em que rodar o `instalar.sh` depois desta mudança, ele pede:
+
+1. **Connection string**: no Supabase, clique em **Connect** (no topo) →
+   **Session pooler** → copie o texto que começa com `postgresql://`. Pode colar
+   como está (com `[YOUR-PASSWORD]`): o script tira a senha do endereço.
+2. **Senha do banco** (Database password, definida ao criar o projeto). Se não
+   lembrar: Project Settings → Database → **Reset database password**.
+   Ela não aparece ao digitar e fica só no `.env` da VPS.
+
+Na primeira execução, o script reconhece o que já tinha sido rodado à mão no
+SQL Editor e só registra, sem rodar de novo. Não é mais preciso colar SQL no
+Supabase.
+
+> Mudanças de estrutura do banco devem vir sempre por arquivo em
+> `supabase/migrations/` (PR). Alterações feitas direto no painel do Supabase
+> não voltam para o código.
 
 ## 8. Atendimento por IA
 
