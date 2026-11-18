@@ -1,9 +1,10 @@
-import Anthropic from "@anthropic-ai/sdk";
+import type OpenAI from "openai";
 import { z } from "zod";
 import { buildSystemPrompt, toMessages, type HistoryItem } from "./prompt";
 import type { AiSettings } from "./settings";
 
-export const AI_MODEL = process.env.AI_MODEL || "claude-opus-5-5";
+/** Modelo da OpenAI usado pelo atendente (configurável por AI_MODEL). */
+export const AI_MODEL = process.env.AI_MODEL || "gpt-5.5";
 
 const replySchema = z.object({
   resposta: z.string().max(4000),
@@ -20,7 +21,7 @@ const REPLY_JSON_SCHEMA = {
   },
   required: ["resposta", "transferir_para_humano", "motivo"],
   additionalProperties: false,
-} as const;
+};
 
 export interface AiReply {
   reply: string;
@@ -29,13 +30,17 @@ export interface AiReply {
   usage: { input_tokens: number; output_tokens: number; cache_read_tokens: number; model: string };
 }
 
+/** Cliente mínimo usado aqui (facilita testes com cliente simulado). */
+export type ChatClient = Pick<OpenAI, "chat">;
+
 /**
- * Gera a próxima resposta do atendente. Chamada única ao Claude, com saída
- * estruturada. Se o modelo recusar, não houver histórico válido ou a saída
- * vier inválida, devolve handoff para um humano (nunca envia texto vazio).
+ * Gera a próxima resposta do atendente (OpenAI Chat Completions, saída
+ * estruturada). Se o modelo recusar, cortar a resposta, não houver
+ * histórico válido ou a saída vier inválida, devolve transferência para
+ * um humano — nunca envia texto estranho ao cliente.
  */
 export async function generateReply(opts: {
-  client: Anthropic;
+  client: ChatClient;
   settings: AiSettings;
   companyName: string;
   history: HistoryItem[];
@@ -43,31 +48,32 @@ export async function generateReply(opts: {
   const messages = toMessages(opts.history.slice(-30));
   if (messages.length === 0) return null;
 
-  const response = await opts.client.beta.messages.create({
+  const completion = await opts.client.chat.completions.create({
     model: AI_MODEL,
-    max_tokens: 4000,
-    betas: ["server-side-fallback-2026-07-01"],
-    fallbacks: "default",
-    system: [
-      { type: "text", text: buildSystemPrompt(opts.settings, opts.companyName), cache_control: { type: "ephemeral" } },
-    ],
-    messages,
-    output_config: { effort: "low", format: { type: "json_schema", schema: REPLY_JSON_SCHEMA } },
+    messages: [{ role: "system", content: buildSystemPrompt(opts.settings, opts.companyName) }, ...messages],
+    response_format: {
+      type: "json_schema",
+      json_schema: { name: "resposta_atendimento", strict: true, schema: REPLY_JSON_SCHEMA },
+    },
   });
 
   const usage = {
-    input_tokens: response.usage.input_tokens ?? 0,
-    output_tokens: response.usage.output_tokens ?? 0,
-    cache_read_tokens: response.usage.cache_read_input_tokens ?? 0,
-    model: response.model,
+    input_tokens: completion.usage?.prompt_tokens ?? 0,
+    output_tokens: completion.usage?.completion_tokens ?? 0,
+    cache_read_tokens: completion.usage?.prompt_tokens_details?.cached_tokens ?? 0,
+    model: completion.model ?? AI_MODEL,
   };
   const handoff = (reason: string): AiReply => ({ reply: opts.settings.handoff_message, handoff: true, reason, usage });
 
-  if (response.stop_reason === "refusal") return handoff("O modelo recusou responder");
-  const text = response.content.flatMap((b) => (b.type === "text" ? [b.text] : [])).join("");
+  const choice = completion.choices?.[0];
+  if (!choice) return handoff("Sem resposta do modelo");
+  if (choice.message?.refusal) return handoff("O modelo recusou responder");
+  if (choice.finish_reason === "length" || choice.finish_reason === "content_filter") {
+    return handoff("Resposta interrompida pelo modelo");
+  }
   let parsed: z.infer<typeof replySchema>;
   try {
-    parsed = replySchema.parse(JSON.parse(text));
+    parsed = replySchema.parse(JSON.parse(choice.message?.content ?? ""));
   } catch {
     return handoff("Resposta da IA em formato inválido");
   }

@@ -21,7 +21,7 @@ export default async function AtendimentoIaPage() {
         initial={settings}
         isAdmin={isAdmin}
         usage={usage}
-        aiAvailable={Boolean(process.env.ANTHROPIC_API_KEY)}
+        aiAvailable={Boolean(process.env.OPENAI_API_KEY)}
       />
     </div>
   );

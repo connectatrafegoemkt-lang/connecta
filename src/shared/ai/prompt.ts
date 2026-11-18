@@ -1,4 +1,3 @@
-import type Anthropic from "@anthropic-ai/sdk";
 import type { AiSettings } from "./settings";
 
 const TONE: Record<AiSettings["tone"], string> = {
@@ -74,8 +73,13 @@ export interface HistoryItem {
  * consecutivas do mesmo lado são unidas; a conversa precisa começar e
  * terminar com o cliente.
  */
-export function toMessages(history: HistoryItem[]): Anthropic.MessageParam[] {
-  const out: { role: "user" | "assistant"; content: string }[] = [];
+export interface ChatTurn {
+  role: "user" | "assistant";
+  content: string;
+}
+
+export function toMessages(history: HistoryItem[]): ChatTurn[] {
+  const out: ChatTurn[] = [];
   for (const h of history) {
     const role = h.direction === "entrada" ? "user" : "assistant";
     const text = h.body.trim();

@@ -80,35 +80,47 @@ describe("validação da configuração", () => {
 
 function fakeClient(response: object) {
   const create = vi.fn().mockResolvedValue(response);
-  return { client: { beta: { messages: { create } } } as never, create };
+  return { client: { chat: { completions: { create } } } as never, create };
 }
-const usage = { input_tokens: 100, output_tokens: 20, cache_read_input_tokens: 0 };
+const usage = { prompt_tokens: 100, completion_tokens: 20, prompt_tokens_details: { cached_tokens: 0 } };
+const reply = (content: string | null, extra: object = {}) => ({
+  model: "gpt-5.5",
+  usage,
+  choices: [{ finish_reason: "stop", message: { role: "assistant", content, refusal: null, ...extra } }],
+});
 const history = [{ direction: "entrada" as const, body: "Oi, vocês atendem online?" }];
 
 describe("generateReply", () => {
-  it("devolve a resposta estruturada e usa fallback automático + esforço baixo", async () => {
-    const { client, create } = fakeClient({
-      model: "claude-opus-5-5",
-      stop_reason: "end_turn",
-      usage,
-      content: [{ type: "text", text: JSON.stringify({ resposta: "Sim! Por videochamada.", transferir_para_humano: false, motivo: "faq" }) }],
-    });
+  it("devolve a resposta estruturada (JSON schema estrito) com o prompt do tenant", async () => {
+    const { client, create } = fakeClient(
+      reply(JSON.stringify({ resposta: "Sim! Por videochamada.", transferir_para_humano: false, motivo: "faq" })),
+    );
     const r = await generateReply({ client, settings: S, companyName: "X", history });
-    expect(r).toMatchObject({ reply: "Sim! Por videochamada.", handoff: false });
+    expect(r).toMatchObject({ reply: "Sim! Por videochamada.", handoff: false, usage: { input_tokens: 100, output_tokens: 20 } });
     const args = create.mock.calls[0][0];
-    expect(args.fallbacks).toBe("default");
-    expect(args.output_config.effort).toBe("low");
-    expect(args.messages).toEqual([{ role: "user", content: "Oi, vocês atendem online?" }]);
+    expect(args.response_format.type).toBe("json_schema");
+    expect(args.response_format.json_schema.strict).toBe(true);
+    expect(args.messages[0].role).toBe("system");
+    expect(args.messages[0].content).toContain("Advocacia trabalhista");
+    expect(args.messages.slice(1)).toEqual([{ role: "user", content: "Oi, vocês atendem online?" }]);
+  });
+
+  it("resposta cortada (limite) vira transferência", async () => {
+    const r0 = reply("{\"resposta\": \"Olá");
+    r0.choices[0].finish_reason = "length";
+    const { client } = fakeClient(r0);
+    const r = await generateReply({ client, settings: S, companyName: "X", history });
+    expect(r?.handoff).toBe(true);
   });
 
   it("recusa do modelo vira transferência para humano com a mensagem configurada", async () => {
-    const { client } = fakeClient({ model: "m", stop_reason: "refusal", usage, content: [] });
+    const { client } = fakeClient(reply(null, { refusal: "Não posso ajudar com isso." }));
     const r = await generateReply({ client, settings: S, companyName: "X", history });
     expect(r).toMatchObject({ handoff: true, reply: S.handoff_message });
   });
 
   it("saída inválida vira transferência (nunca envia lixo)", async () => {
-    const { client } = fakeClient({ model: "m", stop_reason: "end_turn", usage, content: [{ type: "text", text: "não é json" }] });
+    const { client } = fakeClient(reply("não é json"));
     const r = await generateReply({ client, settings: S, companyName: "X", history });
     expect(r?.handoff).toBe(true);
   });

@@ -1,6 +1,5 @@
-import type Anthropic from "@anthropic-ai/sdk";
 import type { Logger } from "pino";
-import { generateReply } from "../src/shared/ai/agent";
+import { generateReply, type ChatClient } from "../src/shared/ai/agent";
 import { aiShouldAct, isAiPaused } from "../src/shared/ai/hours";
 import { settingsFromRow } from "../src/shared/ai/settings";
 import type { WorkerTenantRepo } from "./repo";
@@ -17,7 +16,7 @@ export class AiResponder {
 
   constructor(
     private readonly repo: WorkerTenantRepo,
-    private readonly client: Anthropic | null,
+    private readonly client: ChatClient | null,
     private readonly log: Logger,
     private readonly afterEnqueue: () => void,
   ) {}

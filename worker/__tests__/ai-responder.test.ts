@@ -16,12 +16,14 @@ function setup(opts: { mode?: string; paused?: string | null; history?: { direct
     createHandoffTask: vi.fn().mockResolvedValue(undefined),
   };
   const create = vi.fn().mockResolvedValue({
-    model: "claude-opus-5-5",
-    stop_reason: "end_turn",
-    usage: { input_tokens: 50, output_tokens: 10, cache_read_input_tokens: 0 },
-    content: [{ type: "text", text: JSON.stringify({ resposta: "Atendemos das 8h às 18h.", transferir_para_humano: !!opts.handoff, motivo: "faq" }) }],
+    model: "gpt-5.5",
+    usage: { prompt_tokens: 50, completion_tokens: 10 },
+    choices: [{
+      finish_reason: "stop",
+      message: { role: "assistant", refusal: null, content: JSON.stringify({ resposta: "Atendemos das 8h às 18h.", transferir_para_humano: !!opts.handoff, motivo: "faq" }) },
+    }],
   });
-  const client = { beta: { messages: { create } } };
+  const client = { chat: { completions: { create } } };
   const flushed = vi.fn();
   const log = { error: vi.fn(), warn: vi.fn(), info: vi.fn() };
   const ai = new AiResponder(repo as never, client as never, log as never, flushed);

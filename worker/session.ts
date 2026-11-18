@@ -10,7 +10,7 @@ import type { CredentialCipher } from "./crypto";
 import { ackToStatus, handleIncoming, type IncomingMessage } from "./inbound";
 import { phoneToJid, jidToPhone } from "./phone";
 import type { WorkerTenantRepo } from "./repo";
-import type Anthropic from "@anthropic-ai/sdk";
+import type { ChatClient } from "../src/shared/ai/agent";
 import { AiResponder } from "./ai-responder";
 
 /**
@@ -29,9 +29,9 @@ export class TenantSession {
     readonly repo: WorkerTenantRepo,
     private readonly cipher: CredentialCipher,
     private readonly log: Logger,
-    anthropic: Anthropic | null = null,
+    aiClient: ChatClient | null = null,
   ) {
-    this.ai = new AiResponder(repo, anthropic, log, () => {
+    this.ai = new AiResponder(repo, aiClient, log, () => {
       void this.flushOutbox().catch((e) => this.log.error({ err: e }, "falha ao enviar resposta da IA"));
     });
   }

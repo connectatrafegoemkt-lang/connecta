@@ -1,5 +1,5 @@
 import "server-only";
-import Anthropic from "@anthropic-ai/sdk";
+import OpenAI from "openai";
 import { requireAdmin, type TenantContext } from "../context";
 import { badRequest, fromDbError, HttpError, notFound } from "../errors";
 import { generateReply } from "@/shared/ai/agent";
@@ -62,10 +62,10 @@ export async function setContactAi(ctx: TenantContext, contactId: string, active
   if (!data?.length) throw notFound("Contato não encontrado");
 }
 
-let client: Anthropic | null = null;
-function anthropic() {
-  if (!process.env.ANTHROPIC_API_KEY) throw new HttpError(503, "IA não configurada no servidor (ANTHROPIC_API_KEY)");
-  client ??= new Anthropic();
+let client: OpenAI | null = null;
+function openai() {
+  if (!process.env.OPENAI_API_KEY) throw new HttpError(503, "IA não configurada no servidor (OPENAI_API_KEY)");
+  client ??= new OpenAI();
   return client;
 }
 
@@ -75,7 +75,7 @@ export async function testAiReply(ctx: TenantContext, settingsInput: unknown, hi
   const parsed = aiSettingsSchema.safeParse(settingsInput);
   if (!parsed.success) throw badRequest("Configuração inválida");
   const reply = await generateReply({
-    client: anthropic(),
+    client: openai(),
     settings: { ...parsed.data, mode: "automatico" },
     companyName: ctx.tenantName,
     history: history.slice(-20),
