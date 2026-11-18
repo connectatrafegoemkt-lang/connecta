@@ -1,7 +1,7 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import type { Logger } from "pino";
 import { generateReply } from "../src/shared/ai/agent";
-import { aiShouldAct } from "../src/shared/ai/hours";
+import { aiShouldAct, isAiPaused } from "../src/shared/ai/hours";
 import { settingsFromRow } from "../src/shared/ai/settings";
 import type { WorkerTenantRepo } from "./repo";
 
@@ -59,8 +59,7 @@ export class AiResponder {
       if (!aiShouldAct(settings)) return;
       const contact = await this.repo.getContactAiState(contactId);
       if (!contact) return;
-      const paused = contact.ai_paused_until;
-      if (paused && (paused === "infinity" || new Date(paused).getTime() > Date.now())) return;
+      if (isAiPaused(contact.ai_paused_until)) return;
 
       const history = await this.repo.listWhatsappHistory(contactId, 30);
       if (history.at(-1)?.direction !== "entrada") return; // já respondido
