@@ -306,4 +306,29 @@ describe.skipIf(!enabled)("isolamento via API do app (Next.js)", () => {
     // sem login: 401
     expect((await fetch(`${APP}/api/plataforma/clientes`)).status).toBe(401);
   });
+
+  it("suspensão: admin de um cliente não suspende outro; cliente suspenso recebe 423 e não vê dados", async () => {
+    const r = await api(A, `/api/plataforma/clientes/${B.tenantId}/suspensao`, {
+      method: "POST",
+      body: JSON.stringify({ suspenso: true, motivo: "invasão" }),
+    });
+    expect(r.status).toBe(403);
+    const t = await admin.from("tenants").select("suspended_at").eq("id", B.tenantId).single();
+    expect(t.data!.suspended_at).toBeNull();
+
+    // suspende A pelo service_role (o painel faz isso via função do banco)
+    await admin.from("tenants").update({ suspended_at: new Date().toISOString(), suspended_reason: "teste" }).eq("id", A.tenantId);
+    try {
+      for (const path of ["/api/me", "/api/contacts", "/api/tasks", "/api/dashboard"]) {
+        const res = await api(A, path);
+        expect(res.status, path).toBe(423);
+        expect(JSON.stringify(res.body)).not.toContain(A.contactId);
+      }
+      expect((await api(A, "/api/contacts", { method: "POST", body: JSON.stringify({ name: "x" }) })).status).toBe(423);
+      expect((await api(B, "/api/contacts")).status).toBe(200);
+    } finally {
+      await admin.from("tenants").update({ suspended_at: null, suspended_reason: null }).eq("id", A.tenantId);
+    }
+    expect((await api(A, `/api/contacts/${A.contactId}`)).status).toBe(200);
+  });
 });
