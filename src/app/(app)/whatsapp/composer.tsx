@@ -197,7 +197,7 @@ export function Composer({
           <button type="button" className="icon-btn h-10 w-10" title="Anexar arquivo" aria-label="Anexar arquivo" onClick={() => fileInput.current?.click()} disabled={!!audio}>
             <Paperclip className="h-5 w-5" />
           </button>
-          <button type="button" className={`icon-btn h-10 w-10 ${scheduleOpen ? "text-accent" : ""}`} title="Agendar" aria-label="Agendar mensagem" onClick={() => setScheduleOpen((v) => !v)}>
+          <button type="button" className={`icon-btn h-10 w-10 ${scheduleOpen ? "text-[var(--wa-green)]" : ""}`} title="Agendar" aria-label="Agendar mensagem" onClick={() => setScheduleOpen((v) => !v)}>
             <AlarmClock className="h-5 w-5" />
           </button>
           <textarea
@@ -214,17 +214,17 @@ export function Composer({
               }
             }}
             placeholder={audio ? "Áudio pronto para enviar" : file ? "Legenda (opcional)" : "Mensagem — digite / para mensagens rápidas"}
-            className="input max-h-40 min-h-10 flex-1 resize-none rounded-2xl"
+            className="max-h-40 min-h-10 flex-1 resize-none rounded-lg border-0 px-3 py-2.5 text-[0.95rem] text-fg outline-none placeholder:text-subtle"
+            style={{ background: "var(--wa-chip)" }}
             maxLength={4096}
           />
           {!text.trim() && !file && !audio ? (
-            <button type="button" className="btn-primary h-10 w-10 rounded-full p-0" title="Gravar áudio" aria-label="Gravar áudio" onClick={startRecording}>
+            <button type="button" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white transition hover:brightness-110" style={{ background: "var(--wa-green)" }} title="Gravar áudio" aria-label="Gravar áudio" onClick={startRecording}>
               <Mic className="h-5 w-5" />
             </button>
           ) : (
-            <button type="button" className="btn-primary h-10 rounded-full" disabled={pending} onClick={submit}>
-              {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : scheduleOpen ? <AlarmClock className="h-4 w-4" /> : <Send className="h-4 w-4" />}
-              {scheduleOpen ? "Agendar" : "Enviar"}
+            <button type="button" className="flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-full px-3 text-sm font-medium text-white transition hover:brightness-110 disabled:opacity-60" style={{ background: "var(--wa-green)", minWidth: "2.5rem" }} disabled={pending} onClick={submit} aria-label={scheduleOpen ? "Agendar" : "Enviar"} title={scheduleOpen ? "Agendar" : "Enviar"}>
+              {pending ? <Loader2 className="h-5 w-5 animate-spin" /> : scheduleOpen ? <><AlarmClock className="h-4 w-4" /> Agendar</> : <Send className="h-5 w-5" />}
             </button>
           )}
         </div>
