@@ -154,3 +154,7 @@ export const platformSuspendSchema = z.strictObject({
   suspenso: z.boolean(),
   motivo: z.string().trim().max(300).optional(),
 });
+
+export const platformDeleteSchema = z.strictObject({
+  confirmacao: z.string().trim().min(1).max(60),
+});
