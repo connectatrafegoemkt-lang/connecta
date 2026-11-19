@@ -69,7 +69,7 @@ export default async function WhatsappPage({ searchParams }: PageProps<"/whatsap
 
   return (
     <div className="space-y-6">
-      <LiveRefresh tenantId={ctx.tenantId} contactId={contact?.id ?? null} />
+      <LiveRefresh tenantId={ctx.tenantId} contactId={contact?.id ?? null} pendingCount={pending.filter((p) => p.status !== "erro" && !p.scheduled_at).length} />
       <PageHeader icon={MessageCircle} title="WhatsApp" subtitle="Conecte o número da empresa e converse com os contatos em tempo real." />
 
       <ConnectionPanel
