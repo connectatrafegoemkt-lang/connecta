@@ -331,4 +331,61 @@ describe.skipIf(!enabled)("isolamento via API do app (Next.js)", () => {
     }
     expect((await api(A, `/api/contacts/${A.contactId}`)).status).toBe(200);
   });
+
+  it("exclusão de cliente: admin de cliente não exclui outro cliente", async () => {
+    await admin.from("tenants").update({ suspended_at: new Date().toISOString() }).eq("id", B.tenantId);
+    try {
+      const slug = (await admin.from("tenants").select("slug").eq("id", B.tenantId).single()).data!.slug;
+      const r = await api(A, `/api/plataforma/clientes/${B.tenantId}`, { method: "DELETE", body: JSON.stringify({ confirmacao: slug }) });
+      expect(r.status).toBe(403);
+      expect((await admin.from("tenants").select("id").eq("id", B.tenantId)).data).toHaveLength(1);
+    } finally {
+      await admin.from("tenants").update({ suspended_at: null }).eq("id", B.tenantId);
+    }
+  });
+
+  it.runIf(Boolean(process.env.SUPABASE_DB_URL))("exclusão de cliente: equipe CONNECTA exclui com as travas e apaga dados, arquivos e logins", async () => {
+    const { Client } = await import("pg");
+    // cliente descartável C
+    const emailC = `next-c-${run}@teste.connecta.local`;
+    const { data: uc } = await admin.auth.admin.createUser({ email: emailC, password: `Senha-${randomUUID()}`, email_confirm: true });
+    const slugC = `next-c-${run}`;
+    const { data: tenantC } = await admin.rpc("create_tenant_with_admin", { p_name: "Cliente C", p_slug: slugC, p_admin_user_id: uc!.user!.id });
+    const filePath = `${tenantC}/teste/arquivo.txt`;
+    await admin.storage.from("tenant-files").upload(filePath, new Blob(["oi"]), { contentType: "text/plain" });
+    // usuário da plataforma
+    const emailP = `next-plat-${run}@teste.connecta.local`;
+    const passP = `Senha-${randomUUID()}`;
+    const { data: up } = await admin.auth.admin.createUser({ email: emailP, password: passP, email_confirm: true });
+    users.push(up!.user!.id);
+    const pg = new Client({ connectionString: process.env.SUPABASE_DB_URL });
+    await pg.connect();
+    await pg.query("insert into app.platform_admins (user_id) values ($1)", [up!.user!.id]);
+    try {
+      const c = createClient(URL!, ANON!, opts);
+      const { data: s } = await c.auth.signInWithPassword({ email: emailP, password: passP });
+      const P = { ...A, token: s.session!.access_token };
+      const path = `/api/plataforma/clientes/${tenantC}`;
+      // ativo: recusa
+      expect((await api(P, path, { method: "DELETE", body: JSON.stringify({ confirmacao: slugC }) })).status).toBe(400);
+      expect((await api(P, `${path}/suspensao`, { method: "POST", body: JSON.stringify({ suspenso: true }) })).status).toBe(204);
+      // confirmação errada: recusa
+      expect((await api(P, path, { method: "DELETE", body: JSON.stringify({ confirmacao: "errado" }) })).status).toBe(400);
+      const ok = await api(P, path, { method: "DELETE", body: JSON.stringify({ confirmacao: slugC }) });
+      expect(ok.status).toBe(200);
+      expect(ok.body.deleted_users).toBe(1);
+      expect(ok.body.deleted_files).toBe(1);
+      expect((await admin.from("tenants").select("id").eq("id", tenantC)).data).toEqual([]);
+      const { data: listed } = await admin.auth.admin.listUsers({ perPage: 1000 });
+      expect(listed.users.some((u) => u.email === emailC)).toBe(false);
+      // outros clientes intactos
+      expect((await api(A, "/api/contacts")).status).toBe(200);
+      expect((await admin.from("tenants").select("id").eq("id", B.tenantId)).data).toHaveLength(1);
+    } finally {
+      await pg.query("delete from app.platform_admins where user_id = $1", [up!.user!.id]);
+      await pg.end();
+      await admin.from("tenants").delete().eq("id", tenantC as string);
+      if (uc?.user) await admin.auth.admin.deleteUser(uc.user.id).catch(() => undefined);
+    }
+  });
 });
