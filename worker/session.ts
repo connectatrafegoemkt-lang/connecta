@@ -10,6 +10,7 @@ import { loadTenantAuthState } from "./auth-state";
 import type { CredentialCipher } from "./crypto";
 import { ackToStatus, handleIncoming, type IncomingMessage } from "./inbound";
 import { recoverStuckOutbox } from "./outbox-recovery";
+import { refreshContactProfile } from "./profile";
 import { phoneToJid, jidToPhone } from "./phone";
 import { describeMedia, extFromMime, MAX_MEDIA_BYTES, safeName, toOggOpus, type MediaMeta } from "./media";
 import type { WorkerTenantRepo } from "./repo";
@@ -83,6 +84,8 @@ export class TenantSession {
             return null;
           });
           if (rec && (rec.sent || rec.failed)) this.log.info(rec, "fila presa recuperada");
+          // Fotos/recados das conversas recentes (devagar, para não sobrecarregar).
+          setTimeout(() => void this.refreshRecentProfiles(), 5_000);
         }
         if (u.connection === "close") {
           this.connected = false;
@@ -119,6 +122,10 @@ export class TenantSession {
           await handleIncoming(this.repo, m as unknown as IncomingMessage, {
             onStored: ({ contactId, fromMe }) => {
               if (!live) return;
+              const jid = (m as { key?: { remoteJid?: string | null } }).key?.remoteJid;
+              const push = (m as { pushName?: string | null }).pushName?.trim();
+              if (!fromMe && push) void this.repo.setContactWhatsappName(contactId, push).catch(() => undefined);
+              if (jid) void this.refreshProfile(contactId, jid);
               // Mensagem enviada pelo celular por uma pessoa = humano assumiu.
               if (fromMe) void this.ai.pauseForHuman(contactId).catch(() => undefined);
               else this.ai.schedule(contactId);
@@ -181,6 +188,49 @@ export class TenantSession {
   }
 
   /** Envia as mensagens pendentes da fila DESTE tenant. */
+  private profileBusy = new Set<string>();
+
+  /** Atualiza foto/nome/recado do contato (no máximo 1x a cada 24h). */
+  async refreshProfile(contactId: string, jid: string, force = false) {
+    const sock = this.sock;
+    if (!sock || !this.connected || this.profileBusy.has(contactId)) return;
+    this.profileBusy.add(contactId);
+    try {
+      await refreshContactProfile(
+        this.repo,
+        {
+          pictureUrl: async (j) => (await sock.profilePictureUrl(j, "image", 10_000)) ?? null,
+          about: async (j) => sock.fetchStatus(j),
+          download: async (url) => {
+            const res = await fetch(url, { signal: AbortSignal.timeout(15_000) });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            return Buffer.from(await res.arrayBuffer());
+          },
+        },
+        contactId,
+        jid,
+        { force },
+      );
+    } catch (e) {
+      this.log.warn({ err: e, contactId }, "falha ao atualizar perfil do contato");
+    } finally {
+      this.profileBusy.delete(contactId);
+    }
+  }
+
+  private async refreshRecentProfiles() {
+    try {
+      const recent = await this.repo.listRecentConversationContacts(30);
+      for (const c of recent) {
+        if (this.stopped || !this.connected) return;
+        await this.refreshProfile(c.id, phoneToJid(c.phone));
+        await new Promise((r) => setTimeout(r, 1_500));
+      }
+    } catch (e) {
+      this.log.warn({ err: e }, "falha ao atualizar perfis recentes");
+    }
+  }
+
   async flushOutbox() {
     if (!this.sock || !this.connected) return;
     const items = await this.repo.claimOutbox();

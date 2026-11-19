@@ -235,6 +235,52 @@ export class WorkerTenantRepo implements InboundRepo {
     return (data?.[0] as { id: string } | undefined) ?? null;
   }
 
+  async getContactProfileState(contactId: string) {
+    const { data, error } = await this.sb
+      .from("contacts")
+      .select("profile_checked_at")
+      .eq("tenant_id", this.tenantId)
+      .eq("id", contactId)
+      .maybeSingle();
+    if (error) throw error;
+    return data as { profile_checked_at: string | null } | null;
+  }
+
+  async saveContactProfile(
+    contactId: string,
+    p: { avatar_path?: string | null; whatsapp_name?: string | null; whatsapp_about?: string | null },
+  ) {
+    if (p.avatar_path) this.assertOwnPath(p.avatar_path);
+    const { error } = await this.sb
+      .from("contacts")
+      .update({ ...p, profile_checked_at: new Date().toISOString() })
+      .eq("tenant_id", this.tenantId)
+      .eq("id", contactId);
+    if (error) throw error;
+  }
+
+  async setContactWhatsappName(contactId: string, name: string) {
+    const { error } = await this.sb
+      .from("contacts")
+      .update({ whatsapp_name: name.slice(0, 120) })
+      .eq("tenant_id", this.tenantId)
+      .eq("id", contactId);
+    if (error) throw error;
+  }
+
+  /** Contatos com conversa recente (para atualizar fotos ao conectar). */
+  async listRecentConversationContacts(limit = 30) {
+    const { data, error } = await this.sb
+      .from("contacts")
+      .select("id, phone")
+      .eq("tenant_id", this.tenantId)
+      .not("phone", "is", null)
+      .order("last_interaction_at", { ascending: false, nullsFirst: false })
+      .limit(limit);
+    if (error) throw error;
+    return (data ?? []) as { id: string; phone: string }[];
+  }
+
   async finishOutbox(id: string, status: "enviado" | "erro" | "pendente", extra: { error?: string; interaction_id?: string } = {}) {
     const { error } = await this.sb
       .from("whatsapp_outbox")
