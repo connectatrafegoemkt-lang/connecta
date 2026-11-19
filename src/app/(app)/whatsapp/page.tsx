@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import Link from "next/link";
+import { ArrowLeft, MessageCircle } from "lucide-react";
 import { can, getTenantContext } from "@/server/context";
 import { getContact } from "@/server/data/contacts";
 import {
@@ -11,19 +11,21 @@ import {
 } from "@/server/data/whatsapp";
 import { idSchema } from "@/server/validation";
 import { getAiSettings, listPendingSuggestion } from "@/server/data/ai";
-import { listQuickReplies } from "@/server/data/whatsapp-media";
+import { listQuickReplies, signedUrlsFor } from "@/server/data/whatsapp-media";
 import { listTags } from "@/server/data/tags";
-import { TagBadge } from "@/components/tag-badge";
+import { listStages } from "@/server/data/stages";
+import { listDepartments } from "@/server/data/departments";
+import { listTasks } from "@/server/data/tasks";
 import { isAiPaused } from "@/shared/ai/hours";
-import { ExternalLink, Inbox, MessageCircle, MessageSquareText, Phone } from "lucide-react";
-import { dateTime, phoneFmt } from "@/components/format";
-import { PageHeader } from "@/components/page-header";
-import { EmptyState } from "@/components/empty-state";
+import { phoneFmt } from "@/components/format";
+import { Avatar } from "@/components/avatar";
 import { ConnectionPanel } from "./connection-panel";
 import { ChatThread } from "./chat-thread";
 import { LiveRefresh } from "./live-refresh";
 import { AiToggle } from "./ai-toggle";
 import { TagPicker } from "./tag-picker";
+import { ConversationList } from "./conversation-list";
+import { LeadDrawer } from "./lead-drawer";
 
 export const metadata = { title: "WhatsApp" };
 
@@ -51,113 +53,115 @@ export default async function WhatsappPage({ searchParams }: PageProps<"/whatsap
   };
 
   let contact = null;
+  let avatarUrl: string | null = null;
   let thread: Awaited<ReturnType<typeof listThread>> = [];
   let pending: Awaited<ReturnType<typeof listPendingOutbox>> = [];
   let suggestion: Awaited<ReturnType<typeof listPendingSuggestion>> = null;
+  let stages: Awaited<ReturnType<typeof listStages>> = [];
+  let departments: Awaited<ReturnType<typeof listDepartments>> = [];
+  let tasks: Awaited<ReturnType<typeof listTasks>> = [];
   if (selected) {
     try {
       contact = await getContact(ctx, selected);
-      [thread, pending, suggestion] = await Promise.all([
+      [thread, pending, suggestion, stages, departments, tasks] = await Promise.all([
         listThread(ctx, selected),
         listPendingOutbox(ctx, selected),
         aiSettings.mode === "sugerir" ? listPendingSuggestion(ctx, selected) : Promise.resolve(null),
+        listStages(ctx),
+        listDepartments(ctx),
+        can(ctx, "tarefas.editar") || can(ctx, "contatos.ver") ? listTasks(ctx, { contact_id: selected }) : Promise.resolve([]),
       ]);
+      if (contact.avatar_path) avatarUrl = (await signedUrlsFor(ctx, [contact.avatar_path])).get(contact.avatar_path) ?? null;
     } catch {
       contact = null; // contato inexistente ou de outro tenant
     }
   }
 
+  const tagLinks = [
+    { id: null, name: "Todas", href: qs({ etiqueta: undefined }), active: !tagFilter },
+    ...tags.map((t) => ({ id: t.id, name: t.name, color: t.color, href: qs({ etiqueta: t.id }), active: tagFilter === t.id })),
+  ];
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <LiveRefresh tenantId={ctx.tenantId} contactId={contact?.id ?? null} pendingCount={pending.filter((p) => p.status !== "erro" && !p.scheduled_at).length} />
-      <PageHeader icon={MessageCircle} title="WhatsApp" subtitle="Conecte o número da empresa e converse com os contatos em tempo real." />
 
-      <ConnectionPanel
-        isAdmin={can(ctx, "whatsapp.conectar")}
-        tenantId={ctx.tenantId}
-        initial={{ status: session.status, phone: session.phone, last_error: session.last_error, qr }}
-      />
+      {session.status !== "conectado" && (
+        <ConnectionPanel
+          isAdmin={can(ctx, "whatsapp.conectar")}
+          tenantId={ctx.tenantId}
+          initial={{ status: session.status, phone: session.phone, last_error: session.last_error, qr }}
+        />
+      )}
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        <aside className="card flex flex-col p-0 lg:col-span-1">
-          <h2 className="section-title border-b border-line px-5 py-4">
-            <MessageSquareText className="h-4 w-4 text-accent" /> Conversas
-          </h2>
-          {tags.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 border-b border-line px-4 py-3">
-              <Link href={qs({ etiqueta: undefined })} className={`chip ${!tagFilter ? "border-brand-500 text-accent-strong" : ""}`}>Todas</Link>
-              {tags.map((t) => (
-                <Link key={t.id} href={qs({ etiqueta: t.id })} className={`chip ${tagFilter === t.id ? "border-brand-500 text-accent-strong" : ""}`}>
-                  <span className="h-2 w-2 rounded-full" style={{ backgroundColor: t.color }} /> {t.name}
-                </Link>
-              ))}
-            </div>
+      <div className="flex h-[calc(100dvh-9rem)] min-h-[32rem] overflow-hidden rounded-2xl border border-line bg-surface shadow-sm md:h-[calc(100dvh-5rem)]">
+        {/* Lista de conversas */}
+        <aside className={`flex w-full flex-col border-r border-line md:w-[23rem] md:shrink-0 ${contact ? "hidden md:flex" : "flex"}`}>
+          <header className="flex h-[3.75rem] items-center justify-between px-4" style={{ background: "var(--wa-panel)" }}>
+            <h1 className="text-lg font-semibold">Conversas</h1>
+            <MessageCircle className="h-5 w-5 text-muted" />
+          </header>
+          {session.status === "conectado" && (
+            <ConnectionPanel
+              compact
+              isAdmin={can(ctx, "whatsapp.conectar")}
+              tenantId={ctx.tenantId}
+              initial={{ status: session.status, phone: session.phone, last_error: session.last_error, qr }}
+            />
           )}
-          <ul className="max-h-[34rem] flex-1 overflow-y-auto p-2">
-            {conversations.map((c) => {
-              const active = c.contact_id === contact?.id;
-              return (
-                <li key={c.contact_id}>
-                  <Link
-                    href={qs({ contato: c.contact_id })}
-                    className={`flex items-center gap-3 rounded-xl px-3 py-3 transition ${active ? "bg-brand-500/15 shadow-[inset_0_0_0_1px_rgb(161_0_255/0.35)]" : "hover:bg-surface-2"}`}
-                  >
-                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent-soft text-accent-strong text-xs font-semibold">
-                      {c.name.slice(0, 1).toUpperCase()}
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="flex justify-between gap-2">
-                        <span className="truncate text-sm font-medium">{c.name}</span>
-                        <span className="shrink-0 text-[11px] text-subtle">{dateTime(c.last_at)}</span>
-                      </span>
-                      <span className="block truncate text-xs text-muted">
-                        {c.last_direction === "saida" ? "Você: " : ""}
-                        {c.last_body}
-                      </span>
-                      {c.tags.length > 0 && (
-                        <span className="mt-1 flex flex-wrap gap-1">{c.tags.slice(0, 3).map((t) => <TagBadge key={t.id} {...t} />)}</span>
-                      )}
-                    </span>
-                  </Link>
-                </li>
-              );
-            })}
-            {conversations.length === 0 && (
-              <li>
-                <EmptyState icon={Inbox} title="Nenhuma conversa ainda" hint="As mensagens recebidas aparecem aqui automaticamente." />
-              </li>
-            )}
-          </ul>
+          <ConversationList
+            selectedId={contact?.id ?? null}
+            tagLinks={tagLinks}
+            items={conversations.map((c) => ({ ...c, href: qs({ contato: c.contact_id }) }))}
+          />
         </aside>
 
-        <section className="card flex min-h-[34rem] flex-col overflow-hidden p-0 lg:col-span-2">
+        {/* Conversa */}
+        <section className={`min-w-0 flex-1 flex-col ${contact ? "flex" : "hidden md:flex"}`}>
           {contact ? (
             <>
-              <header className="flex items-center justify-between gap-3 border-b border-line px-5 py-3.5">
-                <div className="flex items-center gap-3">
-                  <span className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-brand-400 to-brand-700 text-sm font-semibold text-white">
-                    {contact.name.slice(0, 1).toUpperCase()}
-                  </span>
-                  <div>
-                    <Link href={`/contatos/${contact.id}`} className="font-semibold hover:text-accent-strong">
-                      {contact.name}
-                    </Link>
-                    <p className="flex items-center gap-1 text-xs text-muted"><Phone className="h-3 w-3" /> {phoneFmt(contact.phone)}</p>
-                  </div>
-                </div>
-                <div className="flex flex-wrap items-center justify-end gap-1">
-                  <TagPicker contactId={contact.id} all={tags} selected={contact.tags ?? []} />
-                  {aiSettings.mode !== "desligado" && (
-                    <AiToggle
-                      contactId={contact.id}
-                      active={contact.ai_enabled === true}
-                      paused={contact.ai_enabled === true && isAiPaused(contact.ai_paused_until)}
-                    />
-                  )}
-                  <Link href={`/contatos/${contact.id}`} className="btn-ghost btn-sm">
-                    Ver contato <ExternalLink className="h-3.5 w-3.5" />
-                  </Link>
-                </div>
+              <header className="flex h-[3.75rem] items-center gap-3 border-l border-line/40 px-4" style={{ background: "var(--wa-panel)" }}>
+                <a href={qs({ contato: undefined })} className="icon-btn md:hidden" aria-label="Voltar para as conversas"><ArrowLeft className="h-5 w-5" /></a>
+                <Avatar name={contact.name} url={avatarUrl} size={40} zoomable />
+                <LeadDrawer
+                  subtitle={contact.whatsapp_about || phoneFmt(contact.phone)}
+                  actions={
+                    <>
+                      <TagPicker compact contactId={contact.id} all={tags} selected={contact.tags ?? []} />
+                      {aiSettings.mode !== "desligado" && (
+                        <AiToggle
+                          compact
+                          contactId={contact.id}
+                          active={contact.ai_enabled === true}
+                          paused={contact.ai_enabled === true && isAiPaused(contact.ai_paused_until)}
+                        />
+                      )}
+                    </>
+                  }
+                  contact={{
+                    id: contact.id,
+                    name: contact.name,
+                    phone: contact.phone,
+                    email: contact.email,
+                    company: contact.company,
+                    source: contact.source,
+                    notes: contact.notes,
+                    value_cents: contact.value_cents,
+                    stage_id: contact.stage_id,
+                    department_id: contact.department_id,
+                    avatar_url: avatarUrl,
+                    whatsapp_name: contact.whatsapp_name ?? null,
+                    whatsapp_about: contact.whatsapp_about ?? null,
+                    tags: contact.tags ?? [],
+                  }}
+                  stages={stages.map((s) => ({ id: s.id, name: s.name }))}
+                  departments={departments.map((d) => ({ id: d.id, name: d.name }))}
+                  tasks={tasks.map((t) => ({ id: t.id, title: t.title, status: t.status, due_at: t.due_at }))}
+                  canEdit={can(ctx, "contatos.editar")}
+                  canTasks={can(ctx, "tarefas.editar")}
+                  allSectors={can(ctx, "setores.todos")}
+                  myDepartmentIds={ctx.departmentIds}
+                />
               </header>
               <ChatThread
                 contactId={contact.id}
@@ -171,8 +175,12 @@ export default async function WhatsappPage({ searchParams }: PageProps<"/whatsap
               />
             </>
           ) : (
-            <div className="flex flex-1 items-center justify-center p-8">
-              <EmptyState icon={MessageCircle} title="Selecione uma conversa" hint="Ou abra um contato e clique em “Conversar no WhatsApp”." />
+            <div className="wa-chat-bg flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
+              <span className="flex h-20 w-20 items-center justify-center rounded-full" style={{ background: "var(--wa-panel)" }}>
+                <MessageCircle className="h-9 w-9" style={{ color: "var(--wa-green)" }} />
+              </span>
+              <p className="text-xl font-light">CONNECTA para WhatsApp</p>
+              <p className="max-w-sm text-sm text-muted">Escolha uma conversa à esquerda para ver as mensagens, a foto e a ficha do lead.</p>
             </div>
           )}
         </section>

@@ -40,6 +40,18 @@
 :root {
   color-scheme: light;
   --tag-mix: black;
+  /* Conversas no estilo WhatsApp */
+  --wa-bg: #efeae2;
+  --wa-dots: rgb(0 0 0 / 0.045);
+  --wa-panel: #f0f2f5;
+  --wa-in: #ffffff;
+  --wa-out: #d9fdd3;
+  --wa-text: #111b21;
+  --wa-meta: #667781;
+  --wa-tick-read: #53bdeb;
+  --wa-green: #00a884;
+  --wa-active: #f0f2f5;
+  --wa-chip: #ffffff;
   --glow-a: rgb(161 0 255 / 0.07);
   --glow-b: rgb(161 0 255 / 0.04);
 }
@@ -48,6 +60,17 @@
 :root[data-theme="dark"] {
   color-scheme: dark;
   --tag-mix: white;
+  --wa-bg: #0b141a;
+  --wa-dots: rgb(255 255 255 / 0.035);
+  --wa-panel: #202c33;
+  --wa-in: #202c33;
+  --wa-out: #005c4b;
+  --wa-text: #e9edef;
+  --wa-meta: #8696a0;
+  --wa-tick-read: #53bdeb;
+  --wa-green: #00a884;
+  --wa-active: #2a3942;
+  --wa-chip: #111b21;
   --glow-a: rgb(161 0 255 / 0.16);
   --glow-b: rgb(161 0 255 / 0.08);
   --color-page: #050409;
@@ -146,4 +169,58 @@ body {
   .text-gradient {
     @apply bg-gradient-to-r from-accent-strong via-brand-500 to-brand-400 bg-clip-text text-transparent;
   }
+}
+
+/* ---------- Conversas no estilo WhatsApp ---------- */
+@layer components {
+  .wa-chat-bg {
+    background-color: var(--wa-bg);
+    background-image: radial-gradient(var(--wa-dots) 1.2px, transparent 1.2px);
+    background-size: 22px 22px;
+  }
+  .wa-bubble {
+    position: relative;
+    max-width: min(75%, 34rem);
+    border-radius: 0.6rem;
+    padding: 0.4rem 0.55rem 0.3rem;
+    font-size: 0.9rem;
+    line-height: 1.35;
+    color: var(--wa-text);
+    box-shadow: 0 1px 0.5px rgb(11 20 26 / 0.13);
+  }
+  .wa-in { background: var(--wa-in); }
+  .wa-out { background: var(--wa-out); }
+  .wa-tail-in { border-top-left-radius: 0; }
+  .wa-tail-out { border-top-right-radius: 0; }
+  .wa-tail-in::before,
+  .wa-tail-out::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    width: 8px;
+    height: 13px;
+  }
+  .wa-tail-in::before {
+    left: -8px;
+    background: linear-gradient(to bottom left, var(--wa-in) 50%, transparent 50%);
+  }
+  .wa-tail-out::before {
+    right: -8px;
+    background: linear-gradient(to bottom right, var(--wa-out) 50%, transparent 50%);
+  }
+  .wa-meta { color: var(--wa-meta); font-size: 0.68rem; }
+  .wa-day {
+    border-radius: 0.5rem;
+    background: var(--wa-chip);
+    color: var(--wa-meta);
+    font-size: 0.72rem;
+    font-weight: 500;
+    padding: 0.3rem 0.7rem;
+    box-shadow: 0 1px 0.5px rgb(11 20 26 / 0.13);
+  }
+}
+
+@keyframes slidein {
+  from { transform: translateX(24px); opacity: 0.6; }
+  to { transform: translateX(0); opacity: 1; }
 }

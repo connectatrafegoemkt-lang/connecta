@@ -67,13 +67,19 @@ export interface Conversation {
   last_at: string;
   last_body: string;
   last_direction: string;
+  last_status: string | null;
+  avatar_url: string | null;
+  about: string | null;
 }
 
 /** Contatos com mensagens de WhatsApp, mais recentes primeiro. */
 export async function listConversations(ctx: TenantContext, opts: { limit?: number; tagId?: string } = {}): Promise<Conversation[]> {
   const limit = opts.limit ?? 50;
   const { data, error } = await ctx.db
-    .select("interactions", "contact_id, body, direction, occurred_at, contacts(name, phone, contact_tags(tags(id, name, color)))")
+    .select(
+      "interactions",
+      "contact_id, body, direction, status, occurred_at, contacts(name, phone, avatar_path, whatsapp_about, contact_tags(tags(id, name, color)))",
+    )
     .eq("type", "whatsapp")
     .order("occurred_at", { ascending: false })
     .limit(500);
@@ -83,8 +89,15 @@ export async function listConversations(ctx: TenantContext, opts: { limit?: numb
     contact_id: string;
     body: string;
     direction: string;
+    status: string | null;
     occurred_at: string;
-    contacts: { name: string; phone: string | null; contact_tags?: { tags: { id: string; name: string; color: string } | null }[] } | null;
+    contacts: {
+      name: string;
+      phone: string | null;
+      avatar_path: string | null;
+      whatsapp_about: string | null;
+      contact_tags?: { tags: { id: string; name: string; color: string } | null }[];
+    } | null;
   }[]) {
     if (seen.has(r.contact_id)) continue;
     const tags = (r.contacts?.contact_tags ?? []).flatMap((ct) => (ct.tags ? [ct.tags] : []));
@@ -97,10 +110,15 @@ export async function listConversations(ctx: TenantContext, opts: { limit?: numb
       last_at: r.occurred_at,
       last_body: r.body,
       last_direction: r.direction,
+      last_status: r.status,
+      avatar_url: r.contacts?.avatar_path ?? null, // trocado pelo link assinado abaixo
+      about: r.contacts?.whatsapp_about ?? null,
     });
     if (seen.size >= limit) break;
   }
-  return [...seen.values()];
+  const list = [...seen.values()];
+  const urls = await signedUrlsFor(ctx, list.flatMap((c) => (c.avatar_url ? [c.avatar_url] : [])));
+  return list.map((c) => ({ ...c, avatar_url: c.avatar_url ? urls.get(c.avatar_url) ?? null : null }));
 }
 
 export interface ThreadMessage {

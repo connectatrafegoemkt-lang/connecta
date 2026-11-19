@@ -33,7 +33,7 @@ const TONE: Record<Status, string> = {
  * Status e QR em tempo real. O QR chega por Realtime da tabela whatsapp_qr,
  * cujo RLS só entrega linhas ao ADMIN do próprio tenant.
  */
-export function ConnectionPanel({ initial, isAdmin, tenantId }: { initial: State; isAdmin: boolean; tenantId: string }) {
+export function ConnectionPanel({ initial, isAdmin, tenantId, compact = false }: { initial: State; isAdmin: boolean; tenantId: string; compact?: boolean }) {
   const [state, setState] = useState(initial);
   const [qrSvg, setQrSvg] = useState<string | null>(null);
   const [pending, start] = useTransition();
@@ -85,6 +85,23 @@ export function ConnectionPanel({ initial, isAdmin, tenantId }: { initial: State
     });
 
   const StatusIcon = state.status === "conectado" ? Wifi : state.status === "conectando" ? Loader2 : state.status === "aguardando_qr" ? QrCode : WifiOff;
+
+  // Conectado: só uma faixa discreta (como o WhatsApp Web), sem ocupar a tela.
+  if (compact && state.status === "conectado") {
+    return (
+      <div className="flex items-center justify-between gap-3 px-4 py-2 text-xs" style={{ background: "var(--wa-panel)" }}>
+        <span className="flex items-center gap-1.5 text-muted">
+          <Wifi className="h-3.5 w-3.5" style={{ color: "var(--wa-green)" }} />
+          Conectado{state.phone ? ` · +${state.phone}` : ""}
+        </span>
+        {isAdmin && (
+          <button disabled={pending} onClick={() => run(whatsappDisconnectAction)} className="font-medium text-muted hover:text-danger">
+            {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Desconectar"}
+          </button>
+        )}
+      </div>
+    );
+  }
 
   return (
     <section className="card relative overflow-hidden">
