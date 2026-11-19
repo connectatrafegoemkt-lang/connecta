@@ -7,6 +7,23 @@ const eslintConfig = defineConfig([
   ...nextTs,
   globalIgnores([".next/**", "out/**", "build/**", "next-env.d.ts", "worker/dist/**"]),
 
+  // useEffect não pode devolver valor implícito: o React chama o retorno como
+  // limpeza. Ex.: () => el.scrollIntoView() devolve Promise no Chrome novo e
+  // quebrava a tela do WhatsApp ("i is not a function").
+  {
+    files: ["src/**/*.tsx"],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector:
+            "CallExpression[callee.name=/^(useEffect|useLayoutEffect)$/] > ArrowFunctionExpression.arguments:first-child[body.type!='BlockStatement'][body.type!='ArrowFunctionExpression']",
+          message: "Use chaves no efeito: useEffect(() => { ... }). O valor devolvido vira função de limpeza.",
+        },
+      ],
+    },
+  },
+
   // ISOLAMENTO: acesso a dados só pela camada src/server/.
   {
     files: ["src/**/*.{ts,tsx}"],
