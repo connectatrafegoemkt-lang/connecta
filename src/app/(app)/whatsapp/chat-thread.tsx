@@ -67,7 +67,12 @@ export function ChatThread({
       await setSuggestionStatusAction(suggestion.id, "descartada");
     });
   }
-  useEffect(() => end.current?.scrollIntoView({ block: "end" }), [messages.length, pending.length]);
+  // Bloco com chaves: o efeito NÃO pode devolver o retorno do scrollIntoView.
+  // No Chrome novo ele devolve uma Promise, e o React tentaria chamá-la como
+  // limpeza ("i is not a function") ao chegar mensagem ou ao sair da tela.
+  useEffect(() => {
+    end.current?.scrollIntoView({ block: "end" });
+  }, [messages.length, pending.length]);
 
   return (
     <>
