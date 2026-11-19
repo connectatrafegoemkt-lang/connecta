@@ -9,6 +9,7 @@ import type { Logger } from "pino";
 import { loadTenantAuthState } from "./auth-state";
 import type { CredentialCipher } from "./crypto";
 import { ackToStatus, handleIncoming, type IncomingMessage } from "./inbound";
+import { recoverStuckOutbox } from "./outbox-recovery";
 import { phoneToJid, jidToPhone } from "./phone";
 import { describeMedia, extFromMime, MAX_MEDIA_BYTES, safeName, toOggOpus, type MediaMeta } from "./media";
 import type { WorkerTenantRepo } from "./repo";
@@ -76,6 +77,12 @@ export class TenantSession {
             last_error: null,
           });
           this.log.info("WhatsApp conectado");
+          // Mensagens que ficaram presas em "enviando" num reinício (ex.: deploy).
+          const rec = await recoverStuckOutbox(this.repo).catch((e) => {
+            this.log.error({ err: e }, "falha ao recuperar fila presa");
+            return null;
+          });
+          if (rec && (rec.sent || rec.failed)) this.log.info(rec, "fila presa recuperada");
         }
         if (u.connection === "close") {
           this.connected = false;

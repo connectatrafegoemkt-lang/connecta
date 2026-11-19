@@ -205,6 +205,36 @@ export class WorkerTenantRepo implements InboundRepo {
     return claimed;
   }
 
+  /** Linhas da fila presas em "enviando" (o worker caiu no meio do envio). */
+  async listStuckOutbox(olderThanIso: string) {
+    const { data, error } = await this.sb
+      .from("whatsapp_outbox")
+      .select("id, contact_id, body, created_at")
+      .eq("tenant_id", this.tenantId)
+      .eq("status", "enviando")
+      .lt("updated_at", olderThanIso)
+      .limit(50);
+    if (error) throw error;
+    return (data ?? []) as { id: string; contact_id: string; body: string; created_at: string }[];
+  }
+
+  /** A mensagem já aparece na conversa como enviada? */
+  async findSentInteraction(contactId: string, body: string, sinceIso: string) {
+    const { data, error } = await this.sb
+      .from("interactions")
+      .select("id")
+      .eq("tenant_id", this.tenantId)
+      .eq("contact_id", contactId)
+      .eq("type", "whatsapp")
+      .eq("direction", "saida")
+      .eq("body", body)
+      .gte("occurred_at", sinceIso)
+      .order("occurred_at")
+      .limit(1);
+    if (error) throw error;
+    return (data?.[0] as { id: string } | undefined) ?? null;
+  }
+
   async finishOutbox(id: string, status: "enviado" | "erro" | "pendente", extra: { error?: string; interaction_id?: string } = {}) {
     const { error } = await this.sb
       .from("whatsapp_outbox")
