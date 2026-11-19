@@ -29,9 +29,11 @@ const sessions = new Map<string, TenantSession>();
 const aiClient = process.env.OPENAI_API_KEY ? new OpenAI() : null;
 if (!aiClient) log.warn("OPENAI_API_KEY ausente: atendimento por IA desativado");
 let ticking = false;
+let shuttingDown = false;
 let again = false;
 
 async function tick() {
+  if (shuttingDown) return;
   if (ticking) {
     again = true;
     return;
@@ -91,7 +93,13 @@ log.info("worker do WhatsApp iniciado");
 
 for (const sig of ["SIGINT", "SIGTERM"] as const) {
   process.on(sig, async () => {
-    log.info("encerrando…");
+    if (shuttingDown) return;
+    shuttingDown = true;
+    log.info("encerrando… (terminando envios em andamento)");
+    // Espera o ciclo atual (envio em andamento) terminar, até 15s, para não
+    // deixar mensagem presa em "enviando" num deploy.
+    const deadline = Date.now() + 15_000;
+    while (ticking && Date.now() < deadline) await new Promise((r) => setTimeout(r, 200));
     await Promise.all([...sessions.values()].map((s) => s.stop(false)));
     process.exit(0);
   });
