@@ -1,10 +1,10 @@
-import { Ban, Bot, Building2, CirclePlay, Contact, MessageCircle, Plus, ShieldCheck, Users } from "lucide-react";
+import { Ban, Trash2, Bot, Building2, CirclePlay, Contact, MessageCircle, Plus, ShieldCheck, Users } from "lucide-react";
 import { getPlatformContext, listClientTenants } from "@/server/platform";
 import { ActionForm } from "@/components/action-form";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { dateTime } from "@/components/format";
-import { createClientTenantAction, setClientSuspendedAction } from "./actions";
+import { createClientTenantAction, deleteClientTenantAction, setClientSuspendedAction } from "./actions";
 
 const WA_LABEL: Record<string, { label: string; cls: string }> = {
   conectado: { label: "Conectado", cls: "text-success" },
@@ -112,10 +112,30 @@ export default async function PlataformaPage() {
                       <td className="whitespace-nowrap px-5 py-3 text-muted">{dateTime(c.created_at)}</td>
                       <td className="px-5 py-3">
                         {c.suspended_at ? (
-                          <ActionForm action={setClientSuspendedAction} submitLabel="Reativar" submitIcon={<CirclePlay className="h-3.5 w-3.5" />} submitClassName="btn-primary btn-sm whitespace-nowrap">
-                            <input type="hidden" name="id" value={c.id} />
-                            <input type="hidden" name="acao" value="reativar" />
-                          </ActionForm>
+                          <div className="flex items-center gap-2">
+                            <ActionForm action={setClientSuspendedAction} submitLabel="Reativar" submitIcon={<CirclePlay className="h-3.5 w-3.5" />} submitClassName="btn-primary btn-sm whitespace-nowrap">
+                              <input type="hidden" name="id" value={c.id} />
+                              <input type="hidden" name="acao" value="reativar" />
+                            </ActionForm>
+                            <details className="relative">
+                              <summary className="btn-danger btn-sm cursor-pointer list-none whitespace-nowrap">
+                                <Trash2 className="h-3.5 w-3.5" /> Excluir
+                              </summary>
+                              <div className="absolute right-0 z-10 mt-2 w-80 rounded-xl border border-danger/40 bg-surface p-3 text-left shadow-xl">
+                                <p className="text-sm font-semibold text-danger">Excluir {c.name} para sempre?</p>
+                                <p className="mt-1 text-xs text-muted">
+                                  Apaga contatos, conversas, tarefas, arquivos, configurações, WhatsApp e os logins da equipe deste cliente. <strong>Não tem como desfazer.</strong>
+                                </p>
+                                <ActionForm action={deleteClientTenantAction} className="mt-3 space-y-2" submitLabel="Excluir para sempre" submitIcon={<Trash2 className="h-3.5 w-3.5" />} submitClassName="btn-danger btn-sm w-full">
+                                  <input type="hidden" name="id" value={c.id} />
+                                  <label className="block text-xs text-muted">
+                                    Para confirmar, digite <span className="font-mono font-semibold text-fg">{c.slug}</span>
+                                    <input name="confirmacao" required autoComplete="off" spellCheck={false} placeholder={c.slug} className="input mt-1 py-1.5 font-mono text-sm" />
+                                  </label>
+                                </ActionForm>
+                              </div>
+                            </details>
+                          </div>
                         ) : (
                           <details className="relative">
                             <summary className="btn-danger btn-sm cursor-pointer list-none whitespace-nowrap">
