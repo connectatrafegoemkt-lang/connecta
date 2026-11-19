@@ -53,3 +53,71 @@ export async function createClientTenant(
   }
   return { tenant_id: tenantId as string, slug };
 }
+
+/** Lista todos os arquivos sob um prefixo do bucket (recursivo). */
+async function listAllFiles(bucket: ReturnType<ReturnType<typeof supabaseAdmin>["storage"]["from"]>, prefix: string): Promise<string[]> {
+  const out: string[] = [];
+  const stack = [prefix];
+  while (stack.length) {
+    const dir = stack.pop()!;
+    for (let offset = 0; ; offset += 1000) {
+      const { data, error } = await bucket.list(dir, { limit: 1000, offset });
+      if (error) throw error;
+      for (const e of data ?? []) {
+        const path = `${dir}/${e.name}`;
+        if (e.id === null) stack.push(path); // pasta
+        else out.push(path);
+      }
+      if (!data || data.length < 1000) break;
+    }
+  }
+  return out;
+}
+
+/**
+ * Exclui DEFINITIVAMENTE um cliente. A autorização e as travas (equipe da
+ * plataforma, cliente suspenso, confirmação pelo identificador, nunca a
+ * própria empresa) são do banco: platform_delete_tenant, chamada com o
+ * cliente do PRÓPRIO usuário. Só depois, com service_role, apagamos os
+ * arquivos do Storage e os logins da equipe daquele cliente.
+ */
+export async function deleteClientTenant(p: PlatformContext, tenantId: string, confirmSlug: string) {
+  if (p?.kind !== "platform") throw new HttpError(403, "Apenas a equipe CONNECTA");
+  const { data, error } = await p.supabase.rpc("platform_delete_tenant", { p_tenant: tenantId, p_confirm_slug: confirmSlug });
+  if (error) {
+    if (error.code === "P0002") throw new HttpError(404, "Cliente não encontrado");
+    if (error.code === "55000" || error.code === "22023") throw badRequest(error.message);
+    if (error.code === "42501") throw new HttpError(403, error.message.includes("própria") ? error.message : "Apenas a equipe CONNECTA");
+    throw new HttpError(500, "Falha ao excluir o cliente");
+  }
+  const userIds = (data as string[] | null) ?? [];
+  const admin = supabaseAdmin();
+
+  // Arquivos do cliente (pasta <tenant_id>/ do bucket privado)
+  let files = 0;
+  try {
+    const bucket = admin.storage.from("tenant-files");
+    const paths = await listAllFiles(bucket, tenantId);
+    for (let i = 0; i < paths.length; i += 100) {
+      const { error: rmErr } = await bucket.remove(paths.slice(i, i + 100));
+      if (rmErr) throw rmErr;
+    }
+    files = paths.length;
+  } catch (e) {
+    console.error("[excluir-cliente] falha ao apagar arquivos", tenantId, e);
+  }
+
+  // Logins da equipe: só quem não ficou vinculado a nenhuma empresa
+  let users = 0;
+  if (userIds.length) {
+    const { data: still } = await admin.from("memberships").select("user_id").in("user_id", userIds);
+    const keep = new Set(((still ?? []) as { user_id: string }[]).map((r) => r.user_id));
+    for (const id of userIds) {
+      if (keep.has(id)) continue;
+      const { error: delErr } = await admin.auth.admin.deleteUser(id);
+      if (delErr) console.error("[excluir-cliente] falha ao apagar login", id, delErr.message);
+      else users++;
+    }
+  }
+  return { deleted_users: users, deleted_files: files };
+}

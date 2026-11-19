@@ -70,6 +70,14 @@ async function tick() {
           .catch(() => undefined);
       }
     }
+    // Cliente excluído: a sessão dele some da lista; fecha a conexão.
+    const present = new Set(states.map((s) => s.tenant_id));
+    for (const [tenantId, running] of sessions) {
+      if (present.has(tenantId)) continue;
+      sessions.delete(tenantId);
+      log.info({ tenant: tenantId }, "cliente removido: sessão encerrada");
+      await running.stop(false).catch((e) => log.error({ err: e }, "falha ao encerrar sessão"));
+    }
     await Promise.all([...sessions.values()].map((s) => s.flushOutbox().catch((e) => log.error({ err: e, tenant: s.tenantId }, "falha na fila"))));
   } catch (e) {
     log.error({ err: e }, "erro no ciclo do worker");

@@ -76,4 +76,4 @@ export async function setClientSuspended(p: PlatformContext, tenantId: string, s
   }
 }
 
-export { createClientTenant } from "./admin/platform-admin";
+export { createClientTenant, deleteClientTenant } from "./admin/platform-admin";
