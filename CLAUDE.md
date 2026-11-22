@@ -56,6 +56,13 @@ Realtime), Tailwind CSS.
    `app.has_perm()` no banco e `requirePerm()`/`can()` no app. Setores
    (`departments`, `member_departments`) limitam a visibilidade de contatos
    via `app.can_see_department()`/`app.can_see_contact()`.
+   Assistente de nicho (primeiro acesso, `src/shared/niches.ts`): o front
+   envia só as RESPOSTAS; o servidor monta o modelo e chama
+   `public.apply_niche_setup()` (SECURITY INVOKER, RLS e permissões do
+   usuário). `tenants.niche/onboarded_at` só mudam via
+   `app.mark_tenant_onboarded()`. Campos extras da ficha ficam em
+   `contact_fields` (por tenant) e `contacts.custom_fields`, validados no
+   servidor contra os campos do próprio tenant.
 8. Auditoria: tabela `audit_logs` com `tenant_id` e `user_id`, preenchida por
    triggers (não depende do app lembrar de registrar).
 9. Testes de isolamento (`tests/isolation/`) rodam em todo PR. Qualquer nova

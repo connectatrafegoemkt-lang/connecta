@@ -30,6 +30,8 @@ import { listTasks } from "@/server/data/tasks";
 import { listStages } from "@/server/data/stages";
 import { listTags } from "@/server/data/tags";
 import { listMembers } from "@/server/data/members";
+import { listContactFields } from "@/server/data/contact-fields";
+import { CustomFieldInputs } from "@/components/custom-field-inputs";
 import { ActionForm } from "@/components/action-form";
 import { EmptyState } from "@/components/empty-state";
 import { brl, dateTime, interactionLabel, phoneFmt } from "@/components/format";
@@ -65,13 +67,14 @@ export default async function ContatoPage({ params }: PageProps<"/contatos/[id]"
     if (e instanceof HttpError && (e.status === 404 || e.status === 400)) notFound();
     throw e;
   }
-  const [interactions, tasks, stages, tags, members, departments] = await Promise.all([
+  const [interactions, tasks, stages, tags, members, departments, fields] = await Promise.all([
     listInteractions(ctx, id),
     listTasks(ctx, { contact_id: id }),
     listStages(ctx),
     listTags(ctx),
     listMembers(ctx),
     listDepartments(ctx),
+    listContactFields(ctx),
   ]);
   const myDepartments = allSectors ? departments : departments.filter((d) => ctx.departmentIds.includes(d.id) || d.id === contact.department_id);
   const tagSet = new Set(contact.tags?.map((t) => t.id));
@@ -162,6 +165,12 @@ export default async function ContatoPage({ params }: PageProps<"/contatos/[id]"
                 {tags.length === 0 && <span className="text-xs text-subtle">Crie tags em Configurações.</span>}
               </div>
             </fieldset>
+            {fields.length > 0 && (
+              <fieldset className="rounded-xl border border-line p-3">
+                <legend className="label px-1">Informações do lead</legend>
+                <CustomFieldInputs fields={fields} values={contact.custom_fields ?? {}} className="grid gap-3" />
+              </fieldset>
+            )}
             <label className="block"><span className="label">Observações</span><textarea name="notes" defaultValue={contact.notes ?? ""} rows={3} className="input" /></label>
             </fieldset>
           </ActionForm>
