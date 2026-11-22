@@ -6,6 +6,7 @@ import { HttpError } from "@/server/errors";
 import { LogoMark, Wordmark } from "@/components/logo";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { currentTheme } from "@/lib/theme";
+import { PlatformNav } from "./platform-nav";
 
 export const metadata = { title: "Painel CONNECTA" };
 
@@ -19,7 +20,7 @@ export default async function PlataformaLayout({ children }: LayoutProps<"/plata
   const theme = await currentTheme();
   return (
     <div className="min-h-screen">
-      <header className="sticky top-0 z-20 border-b border-line bg-page/85 backdrop-blur-xl">
+      <header className="sticky top-0 z-20 border-b border-line bg-page/85 backdrop-blur-xl print:hidden">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3 md:px-8">
           <div className="flex items-center gap-3">
             <LogoMark size={38} />
@@ -45,6 +46,7 @@ export default async function PlataformaLayout({ children }: LayoutProps<"/plata
             </form>
           </div>
         </div>
+        <PlatformNav />
       </header>
       <main className="mx-auto w-full max-w-7xl p-4 md:p-8">{children}</main>
     </div>
