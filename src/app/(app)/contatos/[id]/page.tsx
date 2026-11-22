@@ -105,6 +105,11 @@ export default async function ContatoPage({ params }: PageProps<"/contatos/[id]"
                 </span>
               )}
               {contact.value_cents > 0 && <span className="chip text-fg">{brl(contact.value_cents)}</span>}
+              {contact.ad_at && (
+                <span className="chip border-brand-500/40 bg-brand-500/10 text-accent-strong" title={contact.ad_source?.source_url ?? undefined}>
+                  Veio de anúncio{contact.ad_source?.title ? `: ${contact.ad_source.title}` : ""}
+                </span>
+              )}
             </div>
           </div>
         </div>

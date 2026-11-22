@@ -26,13 +26,16 @@ export interface Contact {
   whatsapp_name?: string | null;
   whatsapp_about?: string | null;
   custom_fields?: Record<string, unknown>;
+  /** Preenchido pelo worker quando o lead veio de anúncio (Click-to-WhatsApp). */
+  ad_source?: { title?: string | null; source_url?: string | null; source_id?: string | null } | null;
+  ad_at?: string | null;
   created_at: string;
   updated_at: string;
   tags?: { id: string; name: string; color: string }[];
 }
 
 const COLUMNS =
-  "id, tenant_id, name, email, phone, company, source, notes, value_cents, stage_id, stage_position, owner_id, department_id, last_interaction_at, ai_enabled, ai_paused_until, avatar_path, whatsapp_name, whatsapp_about, custom_fields, created_at, updated_at";
+  "id, tenant_id, name, email, phone, company, source, notes, value_cents, stage_id, stage_position, owner_id, department_id, last_interaction_at, ai_enabled, ai_paused_until, avatar_path, whatsapp_name, whatsapp_about, custom_fields, ad_source, ad_at, created_at, updated_at";
 const WITH_TAGS = `${COLUMNS}, contact_tags(tags(id, name, color))`;
 
 type RawContact = Contact & { contact_tags?: { tags: { id: string; name: string; color: string } | null }[] };

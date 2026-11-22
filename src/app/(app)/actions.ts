@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { getTenantContext } from "@/server/context";
+import { getTenantContext, requirePerm } from "@/server/context";
 import { localToIso, parseOrThrow, pick, reaisToCents, toActionError, type ActionState } from "@/server/forms";
 import {
   contactCreateSchema,
@@ -32,7 +32,7 @@ import { createContact, deleteContact, moveContact, updateContact } from "@/serv
 import { createInteraction, deleteInteraction } from "@/server/data/interactions";
 import { createTask, deleteTask, updateTask } from "@/server/data/tasks";
 import { createStage, deleteStage, reorderStages, updateStage } from "@/server/data/stages";
-import { createTag, deleteTag } from "@/server/data/tags";
+import { createTag, deleteTag, setPaidTrafficTags } from "@/server/data/tags";
 import { inviteMember, removeMember, updateMember } from "@/server/data/members";
 import { createDepartment, deleteDepartment } from "@/server/data/departments";
 import { queueWhatsappMessage, requestWhatsapp } from "@/server/data/whatsapp";
@@ -471,6 +471,19 @@ export async function skipNicheSetupAction(): Promise<ActionState> {
     await skipNicheSetup(ctx);
     revalidatePath("/", "layout");
     return { ok: true };
+  } catch (e) {
+    return toActionError(e);
+  }
+}
+
+export async function setPaidTrafficTagsAction(_: ActionState, fd: FormData): Promise<ActionState> {
+  try {
+    const ctx = await getTenantContext();
+    requirePerm(ctx, "configuracoes.gerenciar");
+    const ids = fd.getAll("paid[]").map(String).filter(Boolean).slice(0, 200);
+    await setPaidTrafficTags(ctx, ids.map((id) => parseOrThrow(idSchema, id)));
+    revalidatePath("/configuracoes");
+    return { ok: true, message: "Etiquetas de tráfego pago salvas." };
   } catch (e) {
     return toActionError(e);
   }
