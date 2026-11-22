@@ -1,13 +1,13 @@
 import Link from "next/link";
-import { AlarmClock, CalendarClock, ChevronRight, ClipboardPaste, HandCoins, Plus, Search, Target, Trophy, UserPlus } from "lucide-react";
+import { FileSpreadsheet, RefreshCw, Trash2, AlarmClock, CalendarClock, ChevronRight, ClipboardPaste, HandCoins, Plus, Search, Target, Trophy, UserPlus } from "lucide-react";
 import { getPlatformContext } from "@/server/platform";
-import { listProspects } from "@/server/prospects";
+import { listProspects, listSheetSources, syncDueSheets } from "@/server/prospects";
 import { ActionForm } from "@/components/action-form";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { brl, dateTime, phoneFmt } from "@/components/format";
 import { isOpen, PROSPECT_STATUS, STATUS_LABEL } from "@/shared/prospects";
-import { createProspectAction, importProspectsAction } from "./actions";
+import { addSheetAction, createProspectAction, deleteSheetAction, importProspectsAction, syncSheetAction } from "./actions";
 import { ContactButtons, FollowupPicker, StatusBadge } from "./bits";
 
 export const metadata = { title: "Prospecção" };
@@ -25,7 +25,10 @@ export default async function ProspeccaoPage({ searchParams }: PageProps<"/plata
   const sp = await searchParams;
   const etapa = typeof sp.etapa === "string" && (PROSPECT_STATUS as readonly string[]).includes(sp.etapa) ? sp.etapa : null;
   const q = typeof sp.q === "string" ? sp.q.trim().toLowerCase().slice(0, 100) : "";
-  const all = await listProspects(p);
+  // Planilhas do Google Sheets: lê as que não foram lidas nos últimos 5 min
+  // (com tempo máximo, para a página não ficar presa se o Google demorar).
+  await Promise.race([syncDueSheets(p).catch(() => 0), new Promise((r) => setTimeout(r, 8000))]);
+  const [all, sheets] = await Promise.all([listProspects(p), listSheetSources(p)]);
 
   const now = nowMs();
   const eod = endOfTodaySP();
@@ -108,6 +111,53 @@ export default async function ProspeccaoPage({ searchParams }: PageProps<"/plata
           </ActionForm>
         </details>
       </div>
+
+      <details className="card" open={sheets.length === 0}>
+        <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-2">
+          <span className="section-title"><FileSpreadsheet className="h-4 w-4 text-success" /> Google Sheets</span>
+          <span className="text-xs text-muted">
+            {sheets.length === 0 ? "Conecte uma planilha para as leads entrarem sozinhas" : `${sheets.length} planilha(s) conectada(s) · lidas a cada 5 min ao abrir esta página`}
+          </span>
+        </summary>
+        <ul className="mt-4 divide-y divide-line">
+          {sheets.map((s) => (
+            <li key={s.id} className="flex flex-wrap items-center gap-3 py-3 text-sm">
+              <span className="min-w-0 flex-1">
+                <a href={`https://docs.google.com/spreadsheets/d/${s.sheet_id}/edit#gid=${s.gid}`} target="_blank" rel="noopener noreferrer" className="font-medium hover:underline">
+                  {s.name}
+                </a>
+                <span className={`block text-xs ${s.last_ok === false ? "text-danger" : "text-muted"}`}>
+                  {s.last_sync_at ? `Última leitura ${dateTime(s.last_sync_at)}: ${s.last_result ?? ""}` : "Ainda não lida"} · {s.imported} lead(s) importada(s) no total
+                </span>
+              </span>
+              <ActionForm action={syncSheetAction} submitLabel="Sincronizar agora" submitIcon={<RefreshCw className="h-3.5 w-3.5" />} submitClassName="btn-secondary btn-sm">
+                <input type="hidden" name="id" value={s.id} />
+              </ActionForm>
+              <ActionForm action={deleteSheetAction} submitLabel="Desconectar" submitIcon={<Trash2 className="h-3.5 w-3.5" />} submitClassName="btn-ghost btn-sm hover:text-danger">
+                <input type="hidden" name="id" value={s.id} />
+              </ActionForm>
+            </li>
+          ))}
+        </ul>
+        <div className="mt-2 grid gap-4 lg:grid-cols-2">
+          <ActionForm action={addSheetAction} resetOnSuccess className="space-y-2" submitLabel="Conectar planilha" submitIcon={<FileSpreadsheet className="h-4 w-4" />}>
+            <input name="url" required placeholder="Link da planilha (https://docs.google.com/spreadsheets/d/...)" className="input" aria-label="Link da planilha" />
+            <div className="grid gap-2 sm:grid-cols-2">
+              <input name="name" maxLength={120} placeholder="Nome (ex.: Leads OAB/PR)" className="input" aria-label="Nome da planilha" />
+              <input name="source" maxLength={120} placeholder="Origem das leads (opcional)" className="input" aria-label="Origem" />
+            </div>
+          </ActionForm>
+          <div className="rounded-xl bg-surface-2/60 p-3 text-xs text-muted">
+            <p className="font-medium text-fg">Como preparar a planilha</p>
+            <ol className="mt-1 list-decimal space-y-0.5 pl-4">
+              <li>Primeira linha com os títulos: <strong>Nome</strong> (obrigatório), Telefone ou WhatsApp, Empresa, Cidade, Nicho, E-mail, Origem, Observações.</li>
+              <li>Em <strong>Compartilhar</strong>, deixe “Qualquer pessoa com o link” como <strong>Leitor</strong>. Atenção: quem tiver o link consegue ver a planilha.</li>
+              <li>Cole o link aqui. Para outra aba, abra a aba e copie o link (ele inclui o <span className="font-mono">gid</span>).</li>
+            </ol>
+            <p className="mt-1">Cada linha entra uma única vez (pelo telefone, e-mail ou nome). Lead excluída aqui não volta.</p>
+          </div>
+        </div>
+      </details>
 
       {due.length > 0 && (
         <section className="card border-warning/40">

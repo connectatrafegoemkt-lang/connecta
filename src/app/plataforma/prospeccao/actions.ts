@@ -3,7 +3,16 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getPlatformContext } from "@/server/platform";
-import { deleteProspect, importProspects, logProspectContact, saveProspect } from "@/server/prospects";
+import {
+  addSheetSource,
+  deleteProspect,
+  deleteSheetSource,
+  importProspects,
+  listSheetSources,
+  logProspectContact,
+  saveProspect,
+  syncSheetSource,
+} from "@/server/prospects";
 import { localToIso, parseOrThrow, pick, reaisToCents, toActionError, type ActionState } from "@/server/forms";
 import { idSchema, prospectLogSchema, prospectSchema } from "@/server/validation";
 import { parseProspectList } from "@/shared/prospects";
@@ -94,6 +103,51 @@ export async function importProspectsAction(_: ActionState, fd: FormData): Promi
       ok: true,
       message: `${n} lead(s) importada(s).` + (errors.length ? ` Atenção: ${errors.slice(0, 3).join("; ")}${errors.length > 3 ? "…" : ""}` : ""),
     };
+  } catch (e) {
+    return toActionError(e);
+  }
+}
+
+// ---------------------------------------------------------------- Google Sheets
+
+export async function addSheetAction(_: ActionState, fd: FormData): Promise<ActionState> {
+  try {
+    const p = await getPlatformContext();
+    const url = String(fd.get("url") ?? "").trim().slice(0, 1000);
+    const name = String(fd.get("name") ?? "").trim().slice(0, 120) || "Planilha de leads";
+    const source = String(fd.get("source") ?? "").trim().slice(0, 120) || null;
+    const id = await addSheetSource(p, { name, url, source });
+    const src = (await listSheetSources(p)).find((s) => s.id === id);
+    if (!src) return { ok: false, error: "Planilha não encontrada" };
+    const r = await syncSheetSource(p, src);
+    revalidatePath("/plataforma/prospeccao");
+    if (r.error) return { ok: false, error: `Planilha conectada, mas: ${r.error}` };
+    return { ok: true, message: `Planilha conectada. ${r.added} lead(s) importada(s).` };
+  } catch (e) {
+    return toActionError(e);
+  }
+}
+
+export async function syncSheetAction(_: ActionState, fd: FormData): Promise<ActionState> {
+  try {
+    const p = await getPlatformContext();
+    const id = parseOrThrow(idSchema, fd.get("id"));
+    const src = (await listSheetSources(p)).find((s) => s.id === id);
+    if (!src) return { ok: false, error: "Planilha não encontrada" };
+    const r = await syncSheetSource(p, src);
+    revalidatePath("/plataforma/prospeccao");
+    return r.error ? { ok: false, error: r.error } : { ok: true, message: r.added ? `${r.added} lead(s) nova(s).` : "Nenhuma lead nova." };
+  } catch (e) {
+    return toActionError(e);
+  }
+}
+
+export async function deleteSheetAction(_: ActionState, fd: FormData): Promise<ActionState> {
+  try {
+    const p = await getPlatformContext();
+    await deleteSheetSource(p, parseOrThrow(idSchema, fd.get("id")));
+    revalidatePath("/plataforma/prospeccao");
+    return { ok: true, message: "Planilha desconectada (as leads já importadas continuam)." };
   } catch (e) {
     return toActionError(e);
   }
