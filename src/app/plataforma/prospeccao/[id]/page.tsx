@@ -10,6 +10,8 @@ import { brl, dateTime, phoneFmt, toLocalInput } from "@/components/format";
 import { ACTIVITY_LABEL, ACTIVITY_TYPES, PROSPECT_STATUS, STATUS_LABEL, type ProspectStatus } from "@/shared/prospects";
 import { deleteProspectAction, logContactAction, updateProspectAction } from "../actions";
 import { ContactButtons, FollowupPicker, StatusBadge } from "../bits";
+import { WhatsappDialog } from "../whatsapp-dialog";
+import { ownWhatsappInfo } from "../whatsapp-info";
 
 export const metadata = { title: "Lead da prospecção" };
 
@@ -19,6 +21,7 @@ export default async function ProspectPage({ params }: PageProps<"/plataforma/pr
   const { id } = await params;
   if (!idSchema.safeParse(id).success) notFound();
   const p = await getPlatformContext();
+  const wa = await ownWhatsappInfo();
   let x;
   try {
     x = await getProspect(p, id);
@@ -44,7 +47,10 @@ export default async function ProspectPage({ params }: PageProps<"/plataforma/pr
             {x.next_followup_at && <span className="chip"><CalendarClock className="h-3 w-3" /> Follow-up {dateTime(x.next_followup_at)}</span>}
           </div>
         </div>
-        <ContactButtons phone={x.phone} name={x.name} />
+        <div className="flex items-center gap-2">
+          <WhatsappDialog id={x.id} name={x.name} phone={x.phone} quickReplies={wa.quickReplies} connected={wa.connected} variant="button" />
+          <ContactButtons phone={x.phone} name={x.name} />
+        </div>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">

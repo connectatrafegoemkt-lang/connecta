@@ -9,6 +9,8 @@ import { brl, dateTime, phoneFmt } from "@/components/format";
 import { isOpen, PROSPECT_STATUS, STATUS_LABEL } from "@/shared/prospects";
 import { addSheetAction, createProspectAction, deleteSheetAction, importProspectsAction, syncSheetAction } from "./actions";
 import { ContactButtons, FollowupPicker, StatusBadge } from "./bits";
+import { WhatsappDialog } from "./whatsapp-dialog";
+import { ownWhatsappInfo } from "./whatsapp-info";
 
 export const metadata = { title: "Prospecção" };
 
@@ -28,7 +30,7 @@ export default async function ProspeccaoPage({ searchParams }: PageProps<"/plata
   // Planilhas do Google Sheets: lê as que não foram lidas nos últimos 5 min
   // (com tempo máximo, para a página não ficar presa se o Google demorar).
   await Promise.race([syncDueSheets(p).catch(() => 0), new Promise((r) => setTimeout(r, 8000))]);
-  const [all, sheets] = await Promise.all([listProspects(p), listSheetSources(p)]);
+  const [all, sheets, wa] = await Promise.all([listProspects(p), listSheetSources(p), ownWhatsappInfo()]);
 
   const now = nowMs();
   const eod = endOfTodaySP();
@@ -175,7 +177,8 @@ export default async function ProspeccaoPage({ searchParams }: PageProps<"/plata
                   <span className={`flex items-center gap-1 text-xs ${late ? "font-medium text-danger" : "text-muted"}`}>
                     <CalendarClock className="h-3.5 w-3.5" /> {late ? "Atrasado · " : ""}{dateTime(x.next_followup_at)}
                   </span>
-                  <ContactButtons phone={x.phone} name={x.name} />
+                  <WhatsappDialog id={x.id} name={x.name} phone={x.phone} quickReplies={wa.quickReplies} connected={wa.connected} />
+                          <ContactButtons phone={x.phone} name={x.name} />
                 </li>
               );
             })}
@@ -240,6 +243,7 @@ export default async function ProspeccaoPage({ searchParams }: PageProps<"/plata
                       <td className="whitespace-nowrap px-5 py-3 text-right tabular-nums">{Number(x.value_cents) ? brl(Number(x.value_cents)) : "—"}</td>
                       <td className="px-5 py-3">
                         <span className="flex items-center justify-end gap-1">
+                          <WhatsappDialog id={x.id} name={x.name} phone={x.phone} quickReplies={wa.quickReplies} connected={wa.connected} />
                           <ContactButtons phone={x.phone} name={x.name} />
                           <Link href={`/plataforma/prospeccao/${x.id}`} className="icon-btn h-8 w-8" aria-label={`Abrir ${x.name}`}><ChevronRight className="h-4 w-4" /></Link>
                         </span>

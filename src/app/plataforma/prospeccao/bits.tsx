@@ -1,4 +1,4 @@
-import { MessageCircle, Phone } from "lucide-react";
+import { Phone } from "lucide-react";
 import { STATUS_COLOR, STATUS_LABEL, type ProspectStatus } from "@/shared/prospects";
 
 export function StatusBadge({ status }: { status: string }) {
@@ -11,14 +11,11 @@ export function StatusBadge({ status }: { status: string }) {
   );
 }
 
-/** Abrir conversa no WhatsApp (app/web) e ligar. */
+/** Ligar para a lead (o WhatsApp fica no WhatsappDialog, dentro do sistema). */
 export function ContactButtons({ phone, name }: { phone: string | null; name: string }) {
   if (!phone) return null;
   return (
     <span className="flex items-center gap-1">
-      <a href={`https://wa.me/${phone}`} target="_blank" rel="noopener noreferrer" className="icon-btn h-8 w-8 text-success" title={`WhatsApp de ${name}`} aria-label={`WhatsApp de ${name}`}>
-        <MessageCircle className="h-4 w-4" />
-      </a>
       <a href={`tel:+${phone}`} className="icon-btn h-8 w-8" title={`Ligar para ${name}`} aria-label={`Ligar para ${name}`}>
         <Phone className="h-4 w-4" />
       </a>
