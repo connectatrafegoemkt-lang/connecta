@@ -4,7 +4,7 @@ import { queueMediaMessage } from "@/server/data/whatsapp-media";
 
 /**
  * Envia (ou agenda) áudio/imagem/vídeo/documento para um contato do tenant
- * da sessão. multipart/form-data: file, contact_id, caption?, scheduled_at?, voice?
+ * da sessão. multipart/form-data: file, contact_id, caption?, scheduled_at?, voice?, session_id?
  */
 export const POST = withTenant(async (req, ctx) => {
   let form: FormData;
@@ -14,7 +14,7 @@ export const POST = withTenant(async (req, ctx) => {
     throw badRequest("Envio inválido");
   }
   for (const key of form.keys()) {
-    if (!["file", "contact_id", "caption", "scheduled_at", "voice"].includes(key)) throw badRequest("Campo não permitido");
+    if (!["file", "contact_id", "caption", "scheduled_at", "voice", "session_id"].includes(key)) throw badRequest("Campo não permitido");
   }
   const file = form.get("file");
   if (!(file instanceof File)) throw badRequest("Arquivo ausente");
@@ -25,6 +25,7 @@ export const POST = withTenant(async (req, ctx) => {
     caption: String(form.get("caption") ?? "").trim(),
     scheduledAt: scheduled ? new Date(scheduled).toISOString() : null,
     asVoice: form.get("voice") === "1",
+    sessionId: form.get("session_id") ? parseId(String(form.get("session_id"))) : null,
   });
   return Response.json(result, { status: 202 });
 });

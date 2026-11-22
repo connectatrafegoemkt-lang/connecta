@@ -2,7 +2,7 @@ import "server-only";
 import type { TenantContext } from "../context";
 import { badRequest, fromDbError, notFound } from "../errors";
 import { extFromMime, safeName } from "@/shared/media-names";
-import { getWhatsappSession } from "./whatsapp";
+import { pickSendingNumber } from "./whatsapp";
 
 export type MediaKind = "audio" | "image" | "video" | "document";
 export const MAX_UPLOAD_BYTES = 20 * 1024 * 1024;
@@ -38,21 +38,20 @@ async function ensureContactWithPhone(ctx: TenantContext, contactId: string) {
   if (!(c.data as unknown as { phone: string | null }).phone) throw badRequest("Contato sem telefone");
 }
 
-async function ensureCanSend(ctx: TenantContext, scheduledAt: string | null) {
+/** Valida o agendamento e escolhe o número que vai enviar. */
+async function ensureCanSend(ctx: TenantContext, contactId: string, scheduledAt: string | null, sessionId?: string | null) {
   if (scheduledAt) {
     const when = new Date(scheduledAt).getTime();
     if (!Number.isFinite(when) || when < Date.now() - 60_000) throw badRequest("Data de agendamento no passado");
     if (when > Date.now() + 366 * 86_400_000) throw badRequest("Agendamento muito distante");
-    return;
   }
-  const session = await getWhatsappSession(ctx);
-  if (session.status !== "conectado") throw badRequest("WhatsApp não está conectado");
+  return pickSendingNumber(ctx, contactId, sessionId, !scheduledAt);
 }
 
 /** Envia (ou agenda) uma mensagem com arquivo. O arquivo vai para a pasta do tenant da sessão. */
 export async function queueMediaMessage(
   ctx: TenantContext,
-  input: { contactId: string; file: File; caption: string; scheduledAt: string | null; asVoice: boolean },
+  input: { contactId: string; file: File; caption: string; scheduledAt: string | null; asVoice: boolean; sessionId?: string | null },
 ) {
   if (input.file.size === 0) throw badRequest("Arquivo vazio");
   if (input.file.size > MAX_UPLOAD_BYTES) throw badRequest("Arquivo maior que 20 MB");
@@ -60,7 +59,7 @@ export async function queueMediaMessage(
   const mime = input.file.type || "application/octet-stream";
   const kind = classifyUpload(mime, input.asVoice);
   await ensureContactWithPhone(ctx, input.contactId);
-  await ensureCanSend(ctx, input.scheduledAt);
+  const session_id = await ensureCanSend(ctx, input.contactId, input.scheduledAt, input.sessionId);
 
   const original = input.file.name && input.file.name !== "blob" ? input.file.name : `audio.${extFromMime(mime)}`;
   const path = ctx.db.storagePath("whatsapp", input.contactId, `${Date.now()}-${safeName(original)}`);
@@ -76,6 +75,7 @@ export async function queueMediaMessage(
       media_mime: mime,
       media_filename: kind === "document" ? safeName(original) : null,
       scheduled_at: input.scheduledAt,
+      session_id,
     })
     .select("id, status, scheduled_at")
     .single();
@@ -87,11 +87,17 @@ export async function queueMediaMessage(
 }
 
 /** Texto imediato ou agendado. */
-export async function queueTextMessage(ctx: TenantContext, contactId: string, body: string, scheduledAt: string | null) {
+export async function queueTextMessage(
+  ctx: TenantContext,
+  contactId: string,
+  body: string,
+  scheduledAt: string | null,
+  sessionId?: string | null,
+) {
   await ensureContactWithPhone(ctx, contactId);
-  await ensureCanSend(ctx, scheduledAt);
+  const session_id = await ensureCanSend(ctx, contactId, scheduledAt, sessionId);
   const { data, error } = await ctx.db
-    .insert("whatsapp_outbox", { contact_id: contactId, body, scheduled_at: scheduledAt })
+    .insert("whatsapp_outbox", { contact_id: contactId, body, scheduled_at: scheduledAt, session_id })
     .select("id, status, scheduled_at")
     .single();
   if (error) throw fromDbError(error);

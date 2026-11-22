@@ -77,11 +77,21 @@ export class TenantDb {
 
   /** RPCs permitidas: todas derivam o tenant internamente via auth.uid(). */
   rpc(fn: "dashboard_summary"): ReturnType<SupabaseClient["rpc"]>;
-  rpc(fn: "whatsapp_request", args: { p_action: "conectar" | "desconectar" | "reiniciar" }): ReturnType<SupabaseClient["rpc"]>;
+  rpc(fn: "whatsapp_request", args: { p_action: "conectar" | "desconectar" | "reiniciar"; p_session: string | null }): ReturnType<SupabaseClient["rpc"]>;
+  rpc(fn: "whatsapp_add_number", args: { p_label: string }): ReturnType<SupabaseClient["rpc"]>;
+  rpc(fn: "whatsapp_rename_number", args: { p_session: string; p_label: string }): ReturnType<SupabaseClient["rpc"]>;
+  rpc(fn: "whatsapp_remove_number", args: { p_session: string }): ReturnType<SupabaseClient["rpc"]>;
   rpc(fn: "ai_usage_summary"): ReturnType<SupabaseClient["rpc"]>;
   rpc(fn: "apply_niche_setup", args: { p_niche: string | null; p_setup: Record<string, unknown> }): ReturnType<SupabaseClient["rpc"]>;
   rpc(
-    fn: "dashboard_summary" | "whatsapp_request" | "ai_usage_summary" | "apply_niche_setup",
+    fn:
+      | "dashboard_summary"
+      | "whatsapp_request"
+      | "ai_usage_summary"
+      | "apply_niche_setup"
+      | "whatsapp_add_number"
+      | "whatsapp_rename_number"
+      | "whatsapp_remove_number",
     args?: Record<string, unknown>,
   ) {
     return this.sb.rpc(fn, args);
