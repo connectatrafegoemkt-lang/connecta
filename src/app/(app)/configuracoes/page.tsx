@@ -1,4 +1,8 @@
-import { History, Layers, Lock, Plus, Save, Settings, Tag, Trash2, X, Zap } from "lucide-react";
+import Link from "next/link";
+import { ClipboardList, History, Layers, Lock, Plus, Save, Settings, Sparkles, Tag, Trash2, X, Zap } from "lucide-react";
+import { listContactFields } from "@/server/data/contact-fields";
+import { getSetupState } from "@/server/data/onboarding";
+import { FIELD_TYPE_LABEL, FIELD_TYPES, NICHES } from "@/shared/niches";
 import { can, getTenantContext } from "@/server/context";
 import { listStages } from "@/server/data/stages";
 import { listTags } from "@/server/data/tags";
@@ -17,6 +21,8 @@ import {
   deleteStageAction,
   deleteTagAction,
   updateStageAction,
+  createContactFieldAction,
+  deleteContactFieldAction,
 } from "../actions";
 import { StageOrder } from "./stage-order";
 
@@ -33,6 +39,9 @@ const TABLE_LABEL: Record<string, string> = {
   tenants: "empresa",
   whatsapp_sessions: "WhatsApp",
   whatsapp_outbox: "mensagem de WhatsApp",
+  contact_fields: "campo da ficha",
+  quick_replies: "mensagem rápida",
+  departments: "setor",
 };
 const ACTION_LABEL: Record<string, string> = { INSERT: "criou", UPDATE: "alterou", DELETE: "excluiu" };
 const ACTION_COLOR: Record<string, string> = { INSERT: "bg-success", UPDATE: "bg-brand-400", DELETE: "bg-danger" };
@@ -44,18 +53,33 @@ export default async function ConfiguracoesPage() {
   // "isAdmin" aqui = pode gerenciar funil, tags e mensagens rápidas
   const isAdmin = can(ctx, "configuracoes.gerenciar");
   const canAudit = can(ctx, "auditoria.ver");
-  const [stages, tags, members, logs, quickReplies] = await Promise.all([
+  const [stages, tags, members, logs, quickReplies, fields, setup] = await Promise.all([
     listStages(ctx),
     listTags(ctx),
     listMembers(ctx),
     canAudit ? listAuditLogs(ctx, 50) : Promise.resolve([]),
     can(ctx, "whatsapp.ver") ? listQuickReplies(ctx) : Promise.resolve([]),
+    listContactFields(ctx),
+    getSetupState(ctx),
   ]);
   const memberName = new Map(members.map((m) => [m.user_id, m.display_name ?? "Usuário"]));
 
   return (
     <div className="space-y-8">
       <PageHeader icon={Settings} title="Configurações" subtitle={`Funil, tags, mensagens rápidas e auditoria de ${ctx.tenantName}`} />
+
+      {isAdmin && (
+        <section className="card flex flex-wrap items-center justify-between gap-4 border-brand-500/30 bg-brand-500/5">
+          <div>
+            <h2 className="section-title"><Sparkles className="h-4 w-4 text-accent" /> Assistente de nicho</h2>
+            <p className="mt-1 text-sm text-muted">
+              {setup.niche ? <>Nicho atual: <strong className="text-fg">{NICHES[setup.niche].label}</strong>. </> : null}
+              Responda algumas perguntas e o CRM monta funil, etiquetas, mensagens rápidas, setores, campos da ficha e instruções da IA do seu segmento. O que já existe é mantido.
+            </p>
+          </div>
+          <Link href="/primeiro-acesso" className="btn-primary"><Sparkles className="h-4 w-4" /> Abrir assistente</Link>
+        </section>
+      )}
 
       <section className="card">
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -117,6 +141,38 @@ export default async function ConfiguracoesPage() {
           <ActionForm action={createTagAction} resetOnSuccess className="mt-4 flex flex-wrap items-center gap-2" submitLabel="Criar tag" submitIcon={<Plus className="h-4 w-4" />}>
             <input type="color" name="color" defaultValue="#a100ff" className={colorInput} aria-label="Cor da tag" />
             <input name="name" required placeholder="Nome da tag" className="input max-w-xs" />
+          </ActionForm>
+        )}
+      </section>
+
+      <section className="card">
+        <h2 className="section-title"><ClipboardList className="h-4 w-4 text-accent" /> Informações da ficha do lead</h2>
+        <p className="mt-1 text-sm text-muted">Campos extras que aparecem na ficha de cada lead (no contato e na conversa do WhatsApp).</p>
+        <ul className="mt-4 divide-y divide-line">
+          {fields.map((f) => (
+            <li key={f.id ?? f.key} className="flex items-center gap-3 py-2.5 text-sm">
+              <span className="min-w-0 flex-1">
+                <span className="font-medium">{f.label}</span>{" "}
+                <span className="chip ml-1">{FIELD_TYPE_LABEL[f.type]}</span>
+                {f.type === "opcoes" && <span className="mt-0.5 block truncate text-xs text-muted">{f.options.join(" · ")}</span>}
+              </span>
+              {isAdmin && f.id && (
+                <form action={deleteContactFieldAction}>
+                  <input type="hidden" name="id" value={f.id} />
+                  <button className="icon-btn hover:text-danger" title="Excluir campo" aria-label={`Excluir campo ${f.label}`}><Trash2 className="h-4 w-4" /></button>
+                </form>
+              )}
+            </li>
+          ))}
+          {fields.length === 0 && <li className="py-3 text-sm text-subtle">Nenhum campo extra. Use o assistente de nicho ou crie abaixo.</li>}
+        </ul>
+        {isAdmin && (
+          <ActionForm action={createContactFieldAction} resetOnSuccess className="mt-4 grid gap-2 md:grid-cols-[1fr_12rem]" submitLabel="Criar campo" submitIcon={<Plus className="h-4 w-4" />} submitClassName="btn-primary md:col-start-2 md:justify-self-end">
+            <input name="label" required maxLength={60} placeholder="Nome do campo (ex.: Nº do processo)" className="input" aria-label="Nome do campo" />
+            <select name="type" defaultValue="texto" className="input" aria-label="Tipo do campo">
+              {FIELD_TYPES.map((t) => <option key={t} value={t}>{FIELD_TYPE_LABEL[t]}</option>)}
+            </select>
+            <input name="options" placeholder="Opções da lista, separadas por vírgula (só para “Lista de opções”)" className="input md:col-span-2" aria-label="Opções" />
           </ActionForm>
         )}
       </section>

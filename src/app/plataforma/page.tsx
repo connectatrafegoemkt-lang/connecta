@@ -4,6 +4,7 @@ import { ActionForm } from "@/components/action-form";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { dateTime } from "@/components/format";
+import { NICHE_KEYS, NICHES } from "@/shared/niches";
 import { createClientTenantAction, deleteClientTenantAction, resetClientPasswordAction, setClientSuspendedAction } from "./actions";
 
 const WA_LABEL: Record<string, { label: string; cls: string }> = {
@@ -58,13 +59,19 @@ export default async function PlataformaPage() {
 
       <section className="card">
         <h2 className="section-title"><Plus className="h-4 w-4 text-accent" /> Novo cliente</h2>
-        <p className="mt-1 text-sm text-muted">Cria a empresa no CRM com o funil padrão e o administrador dela. Ele entra com o e-mail e a senha abaixo e cadastra a própria equipe.</p>
+        <p className="mt-1 text-sm text-muted">Cria a empresa no CRM e o administrador dela. No primeiro acesso, ele responde um assistente que monta funil, etiquetas, mensagens e campos do nicho (o nicho escolhido aqui já vem marcado).</p>
         <ActionForm action={createClientTenantAction} resetOnSuccess className="mt-4 grid gap-3 md:grid-cols-2" submitLabel="Criar cliente" submitIcon={<Plus className="h-4 w-4" />} submitClassName="btn-primary md:col-start-2 md:justify-self-end">
           <label><span className="label">Nome do escritório *</span><input name="name" required minLength={2} maxLength={120} placeholder="Ex.: Silva & Souza Advogados" className="input" /></label>
           <label><span className="label">Identificador (opcional)</span><input name="slug" maxLength={40} pattern="[a-z0-9](?:[a-z0-9\-]{0,38}[a-z0-9])?" placeholder="gerado a partir do nome" className="input font-mono" /></label>
           <label><span className="label">Nome do administrador *</span><input name="admin_name" required maxLength={100} placeholder="Ex.: Dra. Ana Silva" className="input" /></label>
           <label><span className="label">E-mail do administrador *</span><input name="admin_email" type="email" required placeholder="ana@silvasouza.adv.br" className="input" /></label>
           <label><span className="label">Senha provisória * (10+ caracteres; ele troca no 1º acesso)</span><input name="admin_password" type="password" required minLength={10} autoComplete="new-password" className="input" /></label>
+          <label><span className="label">Nicho (opcional)</span>
+            <select name="niche" defaultValue="" className="input">
+              <option value="">O cliente escolhe no primeiro acesso</option>
+              {NICHE_KEYS.map((k) => <option key={k} value={k}>{NICHES[k].label}</option>)}
+            </select>
+          </label>
         </ActionForm>
       </section>
 

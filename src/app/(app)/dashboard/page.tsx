@@ -12,7 +12,9 @@ import {
   Wallet,
   type LucideIcon,
 } from "lucide-react";
-import { getTenantContext } from "@/server/context";
+import { redirect } from "next/navigation";
+import { can, getTenantContext } from "@/server/context";
+import { getSetupState } from "@/server/data/onboarding";
 import { getDashboard } from "@/server/data/dashboard";
 import { dueReminders } from "@/server/data/tasks";
 import { listRecentInteractions } from "@/server/data/interactions";
@@ -40,6 +42,8 @@ function Stat({ icon: Icon, label, value, hint, tone = "brand" }: { icon: Lucide
 
 export default async function DashboardPage() {
   const ctx = await getTenantContext();
+  // Primeiro acesso de quem configura a empresa: assistente de nicho.
+  if (can(ctx, "configuracoes.gerenciar") && !(await getSetupState(ctx)).onboardedAt) redirect("/primeiro-acesso");
   const [d, reminders, recent] = await Promise.all([getDashboard(ctx), dueReminders(ctx), listRecentInteractions(ctx, 8)]);
   const maxStage = Math.max(1, ...d.by_stage.map((s) => s.count));
   const totalInStages = d.by_stage.reduce((a, s) => a + s.count, 0);
