@@ -47,6 +47,11 @@ Realtime), Tailwind CSS.
    tabelas `app.prospects`/`app.prospect_activities`, fora da API e sem
    tenant (não são dados de cliente), acessadas só por funções
    `public.platform_prospect*` que exigem `is_platform_admin()`.
+   Tráfego pago / etiquetas do WhatsApp: `contacts.ad_source/ad_at` e
+   `tags.wa_label_id` só o worker grava (trigger `app.guard_worker_columns`).
+   Mudanças de etiqueta feitas por pessoas viram `whatsapp_label_queue`
+   (sem acesso para usuários); mudanças do worker não entram na fila.
+   Investimento em anúncios (`app.tenant_ad_spend`) só pela plataforma.
    Suspensão de cliente (`tenants.suspended_at`, via
    `public.platform_set_tenant_suspended()`): `app.current_tenant_id()` devolve
    NULL para usuários do cliente suspenso, então todo RLS nega; o worker pausa

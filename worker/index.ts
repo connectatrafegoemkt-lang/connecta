@@ -79,6 +79,7 @@ async function tick() {
       await running.stop(false).catch((e) => log.error({ err: e }, "falha ao encerrar sessão"));
     }
     await Promise.all([...sessions.values()].map((s) => s.flushOutbox().catch((e) => log.error({ err: e, tenant: s.tenantId }, "falha na fila"))));
+    await Promise.all([...sessions.values()].map((s) => s.syncLabels()));
   } catch (e) {
     log.error({ err: e }, "erro no ciclo do worker");
   } finally {

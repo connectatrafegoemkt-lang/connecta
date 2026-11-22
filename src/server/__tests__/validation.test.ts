@@ -41,6 +41,8 @@ describe("planilha do relatório mensal", () => {
         id: "x", name: '=HYPERLINK("x")', slug: "a;b", suspended: false, members: 1, contacts_total: 2, leads_new: 3, leads_won: 1,
         won_value_cents: 123456, leads_lost: 0, open_value_cents: 0, wa_in: 0, wa_out: 0, wa_conversations: 0, ai_responses: 0,
         ai_suggestions: 0, ai_tokens: 0, tasks_created: 0, tasks_done: 0, interactions_other: 0, top_sources: [{ source: "Instagram", count: 3 }],
+        paid_leads_new: 4, ad_leads_new: 3, paid_leads_won: 1, paid_won_value_cents: 500000, spend_meta_cents: 80000,
+        spend_google_cents: 20000, spend_other_cents: 0, top_campaigns: [{ campaign: "Campanha INSS", count: 3 }],
       },
     ]);
     const line = csv.split("\r\n")[1]!;
@@ -48,6 +50,8 @@ describe("planilha do relatório mensal", () => {
     expect(line).toContain('"a;b"');
     expect(line).toContain("1234,56");
     expect(line).toContain("Instagram (3)");
+    // tráfego pago vem primeiro: investimento 1.000, CPL 250, ROAS 5
+    expect(line).toContain("1000,00;800,00;200,00;0,00;4;3;250,00;1;5000,00;5,00;Campanha INSS (3)");
   });
 });
 

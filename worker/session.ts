@@ -16,6 +16,8 @@ import { describeMedia, extFromMime, MAX_MEDIA_BYTES, safeName, toOggOpus, type 
 import type { WorkerTenantRepo } from "./repo";
 import type { ChatClient } from "../src/shared/ai/agent";
 import { AiResponder } from "./ai-responder";
+import { adSourceLabel, extractAdReferral } from "./ad-referral";
+import { onLabelEdit, processLabelQueue } from "./labels";
 
 /**
  * Uma conexão WhatsApp de UM tenant. Cada instância tem seu próprio socket,
@@ -121,6 +123,17 @@ export class TenantSession {
         try {
           await handleIncoming(this.repo, m as unknown as IncomingMessage, {
             onStored: ({ contactId, fromMe }) => {
+              // Lead que veio de anúncio (Click-to-WhatsApp): marca como tráfego pago.
+              if (!fromMe) {
+                const ref = extractAdReferral((m as unknown as IncomingMessage).message);
+                if (ref) {
+                  const ts = Number((m as { messageTimestamp?: unknown }).messageTimestamp ?? 0);
+                  const at = ts > 0 ? new Date(ts * 1000).toISOString() : new Date().toISOString();
+                  void this.repo
+                    .markContactFromAd(contactId, ref, at, adSourceLabel(ref))
+                    .catch((e) => this.log.warn({ err: e }, "falha ao marcar lead de anúncio"));
+                }
+              }
               if (!live) return;
               const jid = (m as { key?: { remoteJid?: string | null } }).key?.remoteJid;
               const push = (m as { pushName?: string | null }).pushName?.trim();
@@ -136,6 +149,28 @@ export class TenantSession {
         } catch (e) {
           this.log.error({ err: e }, "falha ao registrar mensagem");
         }
+      }
+    });
+
+    // Etiquetas do WhatsApp Business → etiquetas do CRM
+    sock.ev.on("labels.edit", async (label) => {
+      try {
+        await onLabelEdit(this.repo, label);
+      } catch (e) {
+        this.log.warn({ err: e }, "falha ao sincronizar etiqueta do WhatsApp");
+      }
+    });
+    sock.ev.on("labels.association", async ({ association, type }) => {
+      try {
+        if (association.type !== "label_jid") return;
+        let phone = jidToPhone(association.chatId);
+        if (!phone && association.chatId?.endsWith("@lid")) {
+          const pn = await sock.signalRepository.lidMapping.getPNForLID(association.chatId).catch(() => null);
+          phone = jidToPhone(pn);
+        }
+        if (phone) await this.repo.setContactLabel(phone, String(association.labelId), type === "add");
+      } catch (e) {
+        this.log.warn({ err: e }, "falha ao sincronizar etiqueta da conversa");
       }
     });
 
@@ -259,6 +294,26 @@ export class TenantSession {
         this.log.warn({ err: e, outbox: item.id }, "falha ao enviar");
         await this.repo.finishOutbox(item.id, item.attempts >= 3 ? "erro" : "pendente", { error: msg.slice(0, 500) });
       }
+    }
+  }
+
+  private labelsBusy = false;
+  private lastPrune = 0;
+  /** CRM → WhatsApp: aplica no celular as etiquetas mudadas por pessoas no CRM. */
+  async syncLabels() {
+    const sock = this.sock;
+    if (!sock || !this.connected || this.labelsBusy || !sock.user?.id) return;
+    this.labelsBusy = true;
+    try {
+      await processLabelQueue(this.repo, sock, sock.user.id);
+      if (Date.now() - this.lastPrune > 6 * 3600_000) {
+        this.lastPrune = Date.now();
+        await this.repo.pruneLabelQueue();
+      }
+    } catch (e) {
+      this.log.warn({ err: e }, "falha ao enviar etiquetas ao WhatsApp");
+    } finally {
+      this.labelsBusy = false;
     }
   }
 

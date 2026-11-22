@@ -1,8 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getPlatformContext, createClientTenant, deleteClientTenant, setClientSuspended } from "@/server/platform";
-import { parseOrThrow, pick, toActionError, type ActionState } from "@/server/forms";
+import { getPlatformContext, createClientTenant, deleteClientTenant, setAdSpend, setClientSuspended } from "@/server/platform";
+import { parseOrThrow, pick, reaisToCents, toActionError, type ActionState } from "@/server/forms";
 import { idSchema, platformPasswordResetSchema, platformTenantCreateSchema } from "@/server/validation";
 import { resetClientUserPassword } from "@/server/account";
 
@@ -55,6 +55,23 @@ export async function resetClientPasswordAction(_: ActionState, fd: FormData): P
     const input = parseOrThrow(platformPasswordResetSchema, pick(fd, ["email", "senha"]));
     await resetClientUserPassword(p, id, input.email, input.senha);
     return { ok: true, message: `Senha provisória definida para ${input.email}. A troca será pedida no próximo acesso.` };
+  } catch (e) {
+    return toActionError(e);
+  }
+}
+
+export async function setAdSpendAction(_: ActionState, fd: FormData): Promise<ActionState> {
+  try {
+    const p = await getPlatformContext();
+    const id = parseOrThrow(idSchema, fd.get("id"));
+    const month = String(fd.get("mes") ?? "");
+    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) return { ok: false, error: "Mês inválido" };
+    const cents = (k: string) => reaisToCents(fd.get(k)) ?? 0;
+    const v = { meta: cents("meta"), google: cents("google"), other: cents("outros") };
+    if (Object.values(v).some((n) => n < 0 || n > 1e12)) return { ok: false, error: "Valor inválido" };
+    await setAdSpend(p, id, month, v);
+    revalidatePath("/plataforma/relatorios");
+    return { ok: true, message: "Investimento salvo." };
   } catch (e) {
     return toActionError(e);
   }

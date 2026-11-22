@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { BarChart3, Bot, Download, FileText, HandCoins, MessageCircle, Trophy, UserPlus } from "lucide-react";
-import { getMonthlyReport, getPlatformContext } from "@/server/platform";
+import { BarChart3, Download, FileText, HandCoins, Megaphone, Target, TrendingUp, Trophy, Wallet } from "lucide-react";
+import { getMonthlyReport, getPlatformContext, trafficKpis } from "@/server/platform";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { currentMonth, monthLabel, parseMonth, shiftMonth } from "@/shared/months";
@@ -15,14 +15,24 @@ export default async function RelatoriosPage({ searchParams }: PageProps<"/plata
   const prev = new Map(prevRows.map((r) => [r.id, r]));
   const partial = month === currentMonth();
 
-  const sum = (rs: typeof rows, k: "leads_new" | "leads_won" | "won_value_cents" | "wa_in" | "wa_out" | "ai_responses") =>
-    rs.reduce((a, r) => a + r[k], 0);
+  type K = "paid_leads_new" | "paid_leads_won" | "paid_won_value_cents" | "leads_new";
+  const sum = (rs: typeof rows, k: K) => rs.reduce((a, r) => a + r[k], 0);
+  const spendOf = (rs: typeof rows) => rs.reduce((a, r) => a + trafficKpis(r).spend, 0);
+  const spend = spendOf(rows);
+  const prevSpend = spendOf(prevRows);
+  const leads = sum(rows, "paid_leads_new");
+  const cpl = spend > 0 && leads > 0 ? Math.round(spend / leads) : null;
+  const prevLeads = sum(prevRows, "paid_leads_new");
+  const prevCpl = prevSpend > 0 && prevLeads > 0 ? Math.round(prevSpend / prevLeads) : undefined;
+  const revenue = sum(rows, "paid_won_value_cents");
+  const roas = spend > 0 ? revenue / spend : null;
   const cards = [
-    { icon: UserPlus, label: "Leads novos", value: num(sum(rows, "leads_new")), now: sum(rows, "leads_new"), before: sum(prevRows, "leads_new") },
-    { icon: Trophy, label: "Fechados", value: num(sum(rows, "leads_won")), now: sum(rows, "leads_won"), before: sum(prevRows, "leads_won") },
-    { icon: HandCoins, label: "Valor fechado", value: money(sum(rows, "won_value_cents")), now: sum(rows, "won_value_cents"), before: sum(prevRows, "won_value_cents") },
-    { icon: MessageCircle, label: "Mensagens no WhatsApp", value: num(sum(rows, "wa_in") + sum(rows, "wa_out")), now: sum(rows, "wa_in") + sum(rows, "wa_out"), before: sum(prevRows, "wa_in") + sum(prevRows, "wa_out") },
-    { icon: Bot, label: "Respostas da IA", value: num(sum(rows, "ai_responses")), now: sum(rows, "ai_responses"), before: sum(prevRows, "ai_responses") },
+    { icon: Wallet, label: "Investido em anúncios", value: money(spend), now: spend, before: prevSpend, invert: false },
+    { icon: Megaphone, label: "Leads do tráfego pago", value: num(leads), now: leads, before: prevLeads, invert: false },
+    { icon: Target, label: "Custo por lead", value: cpl === null ? "—" : money(cpl), now: cpl ?? 0, before: cpl === null ? undefined : prevCpl, invert: true },
+    { icon: Trophy, label: "Fechados do tráfego", value: num(sum(rows, "paid_leads_won")), now: sum(rows, "paid_leads_won"), before: sum(prevRows, "paid_leads_won"), invert: false },
+    { icon: HandCoins, label: "Faturamento do tráfego", value: money(revenue), now: revenue, before: sum(prevRows, "paid_won_value_cents"), invert: false },
+    { icon: TrendingUp, label: "Retorno (ROAS)", value: roas === null ? "—" : `${roas.toFixed(1).replace(".", ",")}x`, now: 0, before: undefined, invert: false },
   ];
 
   return (
@@ -43,15 +53,18 @@ export default async function RelatoriosPage({ searchParams }: PageProps<"/plata
         }
       />
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
-        {cards.map((c) => (
-          <div key={c.label} className="card p-4">
-            <c.icon className="h-5 w-5 text-accent" />
-            <p className="mt-3 text-2xl font-semibold tabular-nums">{c.value}</p>
-            <p className="flex flex-wrap items-center gap-x-2 text-xs text-muted">{c.label} <Delta now={c.now} before={c.before} /></p>
-          </div>
-        ))}
-      </div>
+      <section>
+        <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-subtle"><Megaphone className="h-4 w-4 text-accent" /> Tráfego pago (todos os clientes)</h2>
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+          {cards.map((c) => (
+            <div key={c.label} className="card p-4">
+              <c.icon className="h-5 w-5 text-accent" />
+              <p className="mt-3 text-2xl font-semibold tabular-nums">{c.value}</p>
+              <p className="flex flex-wrap items-center gap-x-2 text-xs text-muted">{c.label} <Delta now={c.now} before={c.before} invert={c.invert} /></p>
+            </div>
+          ))}
+        </div>
+      </section>
 
       <section className="card overflow-hidden p-0">
         {rows.length === 0 ? (
@@ -62,37 +75,45 @@ export default async function RelatoriosPage({ searchParams }: PageProps<"/plata
               <thead className="border-b border-line text-left text-xs uppercase tracking-wide text-subtle">
                 <tr>
                   <th className="px-5 py-3 font-medium">Cliente</th>
-                  <th className="px-5 py-3 text-right font-medium">Leads novos</th>
-                  <th className="px-5 py-3 text-right font-medium">Fechados</th>
-                  <th className="px-5 py-3 text-right font-medium">Valor fechado</th>
-                  <th className="px-5 py-3 text-right font-medium">Conversão</th>
-                  <th className="px-5 py-3 text-right font-medium">WhatsApp</th>
-                  <th className="px-5 py-3 text-right font-medium">IA</th>
-                  <th className="px-5 py-3 font-medium">Principal origem</th>
+                  <th className="px-5 py-3 text-right font-medium">Investido</th>
+                  <th className="px-5 py-3 text-right font-medium">Leads do tráfego</th>
+                  <th className="px-5 py-3 text-right font-medium">Custo por lead</th>
+                  <th className="px-5 py-3 text-right font-medium">Fechados do tráfego</th>
+                  <th className="px-5 py-3 text-right font-medium">Faturamento</th>
+                  <th className="px-5 py-3 text-right font-medium">ROAS</th>
+                  <th className="px-5 py-3 text-right font-medium">Todos os leads</th>
                   <th className="px-5 py-3" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-line">
                 {rows.map((r) => {
                   const b = prev.get(r.id);
-                  const conv = r.leads_new ? Math.round((r.leads_won / r.leads_new) * 100) : null;
-                  const top = r.top_sources[0];
+                  const k = trafficKpis(r);
+                  const kb = b ? trafficKpis(b) : null;
                   return (
                     <tr key={r.id} className="align-top hover:bg-surface-2/40">
                       <td className="px-5 py-3">
                         <span className="block font-medium">{r.name}</span>
-                        <span className="block text-xs text-subtle">{num(r.members)} usuário(s) · {num(r.contacts_total)} contatos{r.suspended ? " · suspenso" : ""}</span>
+                        <span className="block text-xs text-subtle">
+                          {r.top_campaigns[0] ? `Top anúncio: ${r.top_campaigns[0].campaign}` : `${num(r.contacts_total)} contatos`}
+                          {r.suspended ? " · suspenso" : ""}
+                        </span>
                       </td>
-                      <td className="px-5 py-3 text-right tabular-nums">{num(r.leads_new)}<br /><Delta now={r.leads_new} before={b?.leads_new} /></td>
-                      <td className="px-5 py-3 text-right tabular-nums">{num(r.leads_won)}<br /><Delta now={r.leads_won} before={b?.leads_won} /></td>
-                      <td className="px-5 py-3 text-right tabular-nums">{money(r.won_value_cents)}<br /><Delta now={r.won_value_cents} before={b?.won_value_cents} /></td>
-                      <td className="px-5 py-3 text-right tabular-nums">{conv === null ? "—" : `${conv}%`}</td>
-                      <td className="whitespace-nowrap px-5 py-3 text-right tabular-nums text-muted">
-                        {num(r.wa_in)} receb. · {num(r.wa_out)} env.
-                        <span className="block text-xs">{num(r.wa_conversations)} conversa(s)</span>
+                      <td className="whitespace-nowrap px-5 py-3 text-right tabular-nums">
+                        {k.spend ? money(k.spend) : <span className="text-warning">informar</span>}
                       </td>
-                      <td className="px-5 py-3 text-right tabular-nums text-muted">{num(r.ai_responses)}</td>
-                      <td className="px-5 py-3 text-muted">{top ? `${top.source} (${num(top.count)})` : "—"}</td>
+                      <td className="px-5 py-3 text-right tabular-nums">
+                        {num(r.paid_leads_new)}<br /><Delta now={r.paid_leads_new} before={b?.paid_leads_new} />
+                        {r.ad_leads_new > 0 && <span className="block text-xs text-subtle">{num(r.ad_leads_new)} via anúncio no WhatsApp</span>}
+                      </td>
+                      <td className="whitespace-nowrap px-5 py-3 text-right tabular-nums">
+                        {k.cpl === null ? "—" : money(k.cpl)}<br />
+                        {k.cpl !== null && kb?.cpl != null && <Delta now={k.cpl} before={kb.cpl} invert />}
+                      </td>
+                      <td className="px-5 py-3 text-right tabular-nums">{num(r.paid_leads_won)}<br /><Delta now={r.paid_leads_won} before={b?.paid_leads_won} /></td>
+                      <td className="whitespace-nowrap px-5 py-3 text-right tabular-nums">{money(r.paid_won_value_cents)}</td>
+                      <td className="px-5 py-3 text-right font-semibold tabular-nums">{k.roas === null ? "—" : `${k.roas.toFixed(1).replace(".", ",")}x`}</td>
+                      <td className="px-5 py-3 text-right tabular-nums text-muted">{num(r.leads_new)}<span className="block text-xs">{num(r.leads_won)} fechados</span></td>
                       <td className="px-5 py-3 text-right">
                         <Link href={`/plataforma/relatorios/${r.id}?mes=${month}`} className="btn-secondary btn-sm whitespace-nowrap">
                           <FileText className="h-3.5 w-3.5" /> Relatório
@@ -107,7 +128,8 @@ export default async function RelatoriosPage({ searchParams }: PageProps<"/plata
         )}
       </section>
       <p className="text-xs text-subtle">
-        “Fechados” e “Perdidos” contam os leads que entraram numa etapa de ganho ou perda no mês. “Conversão” = fechados ÷ leads novos do mês.
+        Lead do tráfego pago = chegou por anúncio no WhatsApp (detectado automaticamente) ou tem uma etiqueta marcada como “tráfego pago”.
+        Custo por lead = investido ÷ leads do tráfego. ROAS = faturamento do tráfego ÷ investido. O investimento é informado no relatório de cada cliente.
       </p>
     </div>
   );

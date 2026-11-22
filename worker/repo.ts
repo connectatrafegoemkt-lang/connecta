@@ -37,7 +37,10 @@ export interface InboundRepo {
   updateInteractionStatus(externalId: string, status: string): Promise<void>;
 }
 
-export class WorkerTenantRepo implements InboundRepo {
+import type { AdReferral } from "./ad-referral";
+import type { LabelQueueItem, LabelRepo } from "./labels";
+
+export class WorkerTenantRepo implements InboundRepo, LabelRepo {
   constructor(
     private readonly sb: SupabaseClient,
     readonly tenantId: string,
@@ -392,6 +395,157 @@ export class WorkerTenantRepo implements InboundRepo {
     const { error } = await this.sb.from("ai_usage").insert({ ...u, tenant_id: this.tenantId });
     if (error) throw error;
   }
+  // ---------- tráfego pago (anúncio Click-to-WhatsApp) ----------
+  /** Marca o contato como lead de anúncio (só a 1ª vez) e aplica a etiqueta de tráfego pago. */
+  async markContactFromAd(contactId: string, ref: AdReferral, at: string, sourceLabel: string) {
+    const { data: c, error } = await this.sb
+      .from("contacts")
+      .select("id, ad_at, source")
+      .eq("tenant_id", this.tenantId)
+      .eq("id", contactId)
+      .maybeSingle();
+    if (error) throw error;
+    if (!c || c.ad_at) return false;
+    const patch: Record<string, unknown> = { ad_source: ref, ad_at: at };
+    if (!c.source || c.source === "WhatsApp") patch.source = sourceLabel;
+    const u = await this.sb.from("contacts").update(patch).eq("tenant_id", this.tenantId).eq("id", contactId).is("ad_at", null);
+    if (u.error) throw u.error;
+    const tagId = await this.ensurePaidTrafficTag();
+    await this.sb
+      .from("contact_tags")
+      .upsert({ tenant_id: this.tenantId, contact_id: contactId, tag_id: tagId }, { onConflict: "tenant_id,contact_id,tag_id", ignoreDuplicates: true });
+    return true;
+  }
+
+  private async ensurePaidTrafficTag(): Promise<string> {
+    const { data } = await this.sb.from("tags").select("id").eq("tenant_id", this.tenantId).eq("paid_traffic", true).order("created_at").limit(1);
+    if (data?.[0]) return data[0].id as string;
+    const byName = await this.sb.from("tags").select("id").eq("tenant_id", this.tenantId).ilike("name", "tráfego pago").maybeSingle();
+    if (byName.data) {
+      await this.sb.from("tags").update({ paid_traffic: true }).eq("tenant_id", this.tenantId).eq("id", byName.data.id);
+      return byName.data.id as string;
+    }
+    const ins = await this.sb
+      .from("tags")
+      .insert({ tenant_id: this.tenantId, name: "Tráfego pago", color: "#a100ff", paid_traffic: true })
+      .select("id")
+      .single();
+    if (ins.error) throw ins.error;
+    return ins.data.id as string;
+  }
+
+  // ---------- etiquetas do WhatsApp Business ----------
+  async upsertTagFromWhatsapp(label: { id: string; name: string; color: string }) {
+    const linked = await this.sb.from("tags").select("id, name").eq("tenant_id", this.tenantId).eq("wa_label_id", label.id).maybeSingle();
+    if (linked.error) throw linked.error;
+    if (linked.data) {
+      const u = await this.sb.from("tags").update({ name: label.name, color: label.color }).eq("tenant_id", this.tenantId).eq("id", linked.data.id);
+      if (u.error && u.error.code !== "23505") throw u.error;
+      return;
+    }
+    const same = await this.sb.from("tags").select("id, wa_label_id").eq("tenant_id", this.tenantId).ilike("name", label.name).limit(1);
+    if (same.error) throw same.error;
+    const t = same.data?.[0];
+    if (t && !t.wa_label_id) {
+      const u = await this.sb.from("tags").update({ wa_label_id: label.id }).eq("tenant_id", this.tenantId).eq("id", t.id);
+      if (u.error) throw u.error;
+      return;
+    }
+    const name = t ? `${label.name} (WhatsApp)`.slice(0, 50) : label.name;
+    const paid = /tr[aá]fego|an[uú]ncio|\bads\b/i.test(name);
+    const ins = await this.sb
+      .from("tags")
+      .insert({ tenant_id: this.tenantId, name, color: label.color, wa_label_id: label.id, paid_traffic: paid });
+    if (ins.error && ins.error.code !== "23505") throw ins.error;
+  }
+
+  async deleteTagByWaLabel(waLabelId: string) {
+    const { error } = await this.sb.from("tags").delete().eq("tenant_id", this.tenantId).eq("wa_label_id", waLabelId);
+    if (error) throw error;
+  }
+
+  /** Etiqueta aplicada/removida de uma conversa no celular. */
+  async setContactLabel(phone: string, waLabelId: string, on: boolean) {
+    const tag = await this.sb.from("tags").select("id").eq("tenant_id", this.tenantId).eq("wa_label_id", waLabelId).maybeSingle();
+    if (tag.error) throw tag.error;
+    if (!tag.data) return; // etiqueta ainda não sincronizada
+    let contact = await this.findContactByPhones([phone]);
+    if (!contact && on) contact = await this.createContact({ name: `+${phone}`, phone });
+    if (!contact) return;
+    if (on) {
+      const r = await this.sb
+        .from("contact_tags")
+        .upsert({ tenant_id: this.tenantId, contact_id: contact.id, tag_id: tag.data.id }, { onConflict: "tenant_id,contact_id,tag_id", ignoreDuplicates: true });
+      if (r.error) throw r.error;
+    } else {
+      const r = await this.sb.from("contact_tags").delete().eq("tenant_id", this.tenantId).eq("contact_id", contact.id).eq("tag_id", tag.data.id);
+      if (r.error) throw r.error;
+    }
+  }
+
+  async claimLabelQueue(limit = 20): Promise<LabelQueueItem[]> {
+    const { data, error } = await this.sb
+      .from("whatsapp_label_queue")
+      .select("id, kind, contact_id, tag_id, wa_label_id, attempts")
+      .eq("tenant_id", this.tenantId)
+      .eq("status", "pendente")
+      .order("created_at")
+      .limit(limit);
+    if (error) throw error;
+    const ids = (data ?? []).map((d) => d.id);
+    if (ids.length) {
+      await this.sb.from("whatsapp_label_queue").update({ status: "processando" }).eq("tenant_id", this.tenantId).in("id", ids);
+    }
+    return (data ?? []) as LabelQueueItem[];
+  }
+
+  async finishLabelQueue(id: string, ok: boolean, error?: string) {
+    if (ok) {
+      await this.sb.from("whatsapp_label_queue").update({ status: "feito", error: null }).eq("tenant_id", this.tenantId).eq("id", id);
+      return;
+    }
+    const { data } = await this.sb.from("whatsapp_label_queue").select("attempts").eq("tenant_id", this.tenantId).eq("id", id).maybeSingle();
+    const attempts = ((data?.attempts as number | undefined) ?? 0) + 1;
+    await this.sb
+      .from("whatsapp_label_queue")
+      .update({ status: attempts >= 5 ? "erro" : "pendente", attempts, error: error ?? null })
+      .eq("tenant_id", this.tenantId)
+      .eq("id", id);
+  }
+
+  async getTag(tagId: string) {
+    const { data, error } = await this.sb.from("tags").select("id, name, color, wa_label_id").eq("tenant_id", this.tenantId).eq("id", tagId).maybeSingle();
+    if (error) throw error;
+    return (data as { id: string; name: string; color: string; wa_label_id: string | null } | null) ?? null;
+  }
+
+  async listWaLabelIds(): Promise<string[]> {
+    const { data, error } = await this.sb.from("tags").select("wa_label_id").eq("tenant_id", this.tenantId).not("wa_label_id", "is", null);
+    if (error) throw error;
+    return (data ?? []).map((d) => d.wa_label_id as string);
+  }
+
+  async setTagWaLabel(tagId: string, waLabelId: string) {
+    const { error } = await this.sb.from("tags").update({ wa_label_id: waLabelId }).eq("tenant_id", this.tenantId).eq("id", tagId);
+    if (error) throw error;
+  }
+
+  async getContactPhone(contactId: string): Promise<string | null> {
+    const { data, error } = await this.sb.from("contacts").select("phone").eq("tenant_id", this.tenantId).eq("id", contactId).maybeSingle();
+    if (error) throw error;
+    return (data?.phone as string | null) ?? null;
+  }
+
+  /** Limpa a fila já processada (mais de 7 dias). */
+  async pruneLabelQueue() {
+    await this.sb
+      .from("whatsapp_label_queue")
+      .delete()
+      .eq("tenant_id", this.tenantId)
+      .in("status", ["feito", "erro"])
+      .lt("created_at", new Date(Date.now() - 7 * 86_400_000).toISOString());
+  }
+
 }
 
 /** Única leitura entre tenants do worker: quais sessões devem estar ativas (e se o cliente está suspenso). */
@@ -410,4 +564,5 @@ export async function listSessionStates(sb: SupabaseClient) {
     const t = Array.isArray(r.tenants) ? r.tenants[0] : r.tenants;
     return { tenant_id: r.tenant_id, desired_state: r.desired_state, status: r.status, suspended: Boolean(t?.suspended_at) };
   });
+
 }

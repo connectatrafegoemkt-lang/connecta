@@ -26,6 +26,8 @@ export interface DrawerContact {
   whatsapp_about: string | null;
   tags: { id: string; name: string; color: string }[];
   custom_fields: Record<string, unknown>;
+  ad_title?: string | null;
+  from_ad?: boolean;
 }
 
 type Opt = { id: string; name: string; color?: string };
@@ -138,6 +140,11 @@ export function LeadDrawer({
                   <p className="text-sm text-muted">~{contact.whatsapp_name}</p>
                 )}
                 <p className="text-sm text-muted">{phoneFmt(contact.phone)}</p>
+                {contact.from_ad && (
+                  <span className="mt-2 rounded-full bg-brand-500/10 px-2.5 py-0.5 text-xs font-medium text-accent-strong">
+                    Veio de anúncio{contact.ad_title ? `: ${contact.ad_title}` : ""}
+                  </span>
+                )}
               </div>
 
               {contact.whatsapp_about && (

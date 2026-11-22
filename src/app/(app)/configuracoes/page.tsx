@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ClipboardList, History, Layers, Lock, Plus, Save, Settings, Sparkles, Tag, Trash2, X, Zap } from "lucide-react";
+import { ClipboardList, Megaphone, MessageCircle, History, Layers, Lock, Plus, Save, Settings, Sparkles, Tag, Trash2, X, Zap } from "lucide-react";
 import { listContactFields } from "@/server/data/contact-fields";
 import { getSetupState } from "@/server/data/onboarding";
 import { FIELD_TYPE_LABEL, FIELD_TYPES, NICHES } from "@/shared/niches";
@@ -23,6 +23,7 @@ import {
   updateStageAction,
   createContactFieldAction,
   deleteContactFieldAction,
+  setPaidTrafficTagsAction,
 } from "../actions";
 import { StageOrder } from "./stage-order";
 
@@ -137,6 +138,27 @@ export default async function ConfiguracoesPage() {
           ))}
           {tags.length === 0 && <li className="text-sm text-subtle">Nenhuma tag criada.</li>}
         </ul>
+        <p className="mt-3 flex items-center gap-1.5 text-xs text-muted">
+          <MessageCircle className="h-3.5 w-3.5 text-success" />
+          Com o WhatsApp Business conectado, as etiquetas ficam sincronizadas com as do celular: criar, renomear, aplicar ou tirar
+          uma etiqueta aqui ou no WhatsApp reflete no outro.
+        </p>
+        {isAdmin && tags.length > 0 && (
+          <ActionForm action={setPaidTrafficTagsAction} className="mt-4 rounded-xl border border-brand-500/30 bg-brand-500/5 p-3" submitLabel="Salvar" submitClassName="btn-secondary btn-sm mt-2">
+            <p className="flex items-center gap-1.5 text-sm font-medium"><Megaphone className="h-4 w-4 text-accent" /> Quais etiquetas são de tráfego pago?</p>
+            <p className="mt-0.5 text-xs text-muted">Leads com essas etiquetas contam como tráfego pago nos relatórios. Quem chega por anúncio de “Enviar mensagem” já é marcado sozinho.</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {tags.map((t) => (
+                <label key={t.id} className="cursor-pointer">
+                  <input type="checkbox" name="paid[]" value={t.id} defaultChecked={t.paid_traffic} className="peer sr-only" />
+                  <span className="chip gap-1.5 peer-checked:border-brand-500 peer-checked:bg-brand-500/15 peer-checked:text-accent-strong">
+                    <span className="h-2 w-2 rounded-full" style={{ backgroundColor: t.color }} /> {t.name}
+                  </span>
+                </label>
+              ))}
+            </div>
+          </ActionForm>
+        )}
         {isAdmin && (
           <ActionForm action={createTagAction} resetOnSuccess className="mt-4 flex flex-wrap items-center gap-2" submitLabel="Criar tag" submitIcon={<Plus className="h-4 w-4" />}>
             <input type="color" name="color" defaultValue="#a100ff" className={colorInput} aria-label="Cor da tag" />

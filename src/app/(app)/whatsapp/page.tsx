@@ -157,6 +157,8 @@ export default async function WhatsappPage({ searchParams }: PageProps<"/whatsap
                     whatsapp_about: contact.whatsapp_about ?? null,
                     tags: contact.tags ?? [],
                     custom_fields: contact.custom_fields ?? {},
+                    from_ad: Boolean(contact.ad_at),
+                    ad_title: contact.ad_source?.title ?? null,
                   }}
                   fields={fields}
                   stages={stages.map((s) => ({ id: s.id, name: s.name }))}
