@@ -1,6 +1,7 @@
 -- =====================================================================
 -- WhatsApp: "Gerar novo QR code" (recomeçar o pareamento do zero)
 --
+-- Mesma regra de permissão de antes (whatsapp.conectar).
 -- whatsapp_request('reiniciar') marca reset_requested_at; o worker apaga as
 -- credenciais guardadas daquele tenant, fecha o socket e conecta de novo,
 -- gerando um QR novo. Útil quando o pareamento trava em "Conectando".
@@ -18,8 +19,8 @@ as $$
 declare
   v_tenant uuid := app.current_tenant_id();
 begin
-  if v_tenant is null or not app.is_admin() then
-    raise exception 'apenas administradores' using errcode = '42501';
+  if v_tenant is null or not app.has_perm('whatsapp.conectar') then
+    raise exception 'sem permissão para conectar o WhatsApp' using errcode = '42501';
   end if;
   if p_action not in ('conectar', 'desconectar', 'reiniciar') then
     raise exception 'ação inválida' using errcode = '22023';
