@@ -42,7 +42,22 @@ async function tick() {
   try {
     const states = await listSessionStates(sb);
     for (const s of states) {
-      const running = sessions.get(s.tenant_id);
+      let running = sessions.get(s.tenant_id);
+      // "Gerar novo QR code": apaga o login guardado e recomeça o pareamento.
+      if (s.reset_requested_at && !s.suspended) {
+        const repo = running?.repo ?? new WorkerTenantRepo(sb, s.tenant_id);
+        log.info({ tenant: s.tenant_id }, "novo QR code pedido: reiniciando pareamento");
+        if (running) {
+          sessions.delete(s.tenant_id);
+          await running.stop(true).catch((e) => log.error({ err: e }, "falha ao parar sessão"));
+          running = undefined;
+        } else {
+          await repo.clearAuth().catch(() => undefined);
+          await repo.setQr(null).catch(() => undefined);
+        }
+        await repo.setSession({ reset_requested_at: null, status: "conectando", desired_state: "conectado" }).catch(() => undefined);
+        s.desired_state = "conectado";
+      }
       const action = planSession({ desired: s.desired_state, suspended: s.suspended, running: Boolean(running) });
       if (action === "start") {
         const session = new TenantSession(

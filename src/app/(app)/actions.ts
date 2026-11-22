@@ -318,6 +318,17 @@ export async function whatsappConnectAction(): Promise<ActionState> {
   }
 }
 
+/** "Gerar novo QR code": recomeça o pareamento do zero. */
+export async function whatsappResetAction(): Promise<ActionState> {
+  try {
+    await requestWhatsapp(await getTenantContext(), "reiniciar");
+    revalidatePath("/whatsapp");
+    return { ok: true };
+  } catch (e) {
+    return toActionError(e);
+  }
+}
+
 export async function whatsappDisconnectAction(): Promise<ActionState> {
   try {
     await requestWhatsapp(await getTenantContext(), "desconectar");

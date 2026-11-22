@@ -2,9 +2,9 @@
 
 import { useEffect, useState, useTransition } from "react";
 import QRCode from "qrcode";
-import { Loader2, Lock, QrCode, Smartphone, Wifi, WifiOff } from "lucide-react";
+import { Loader2, Lock, QrCode, RefreshCw, Smartphone, Wifi, WifiOff } from "lucide-react";
 import { supabaseBrowser } from "@/lib/supabase-browser";
-import { whatsappConnectAction, whatsappDisconnectAction } from "../actions";
+import { whatsappConnectAction, whatsappDisconnectAction, whatsappResetAction } from "../actions";
 
 type Status = "desconectado" | "aguardando_qr" | "conectando" | "conectado" | "erro";
 interface State {
@@ -62,6 +62,38 @@ export function ConnectionPanel({ initial, isAdmin, tenantId, compact = false }:
     };
   }, [tenantId]);
 
+  // Reserva do tempo real: enquanto não estiver conectado, consulta o status e
+  // o QR a cada 3 s (o QR muda a cada ~20 s). Sem isso, se o Realtime falhar,
+  // a tela fica em "Conectando…" e o QR nunca aparece.
+  const polling = state.status !== "conectado" && state.status !== "desconectado";
+  useEffect(() => {
+    if (!polling) return;
+    let stop = false;
+    const tick = async () => {
+      if (document.visibilityState !== "visible") return;
+      try {
+        const res = await fetch("/api/whatsapp/status", { cache: "no-store" });
+        if (!res.ok || stop) return;
+        const j = (await res.json()) as Partial<State>;
+        setState((s) => ({
+          ...s,
+          status: (j.status as Status) ?? s.status,
+          phone: j.phone ?? null,
+          last_error: j.last_error ?? null,
+          qr: isAdmin ? (j.qr ?? null) : s.qr,
+        }));
+      } catch {
+        /* rede instável: tenta de novo no próximo ciclo */
+      }
+    };
+    void tick();
+    const t = setInterval(() => void tick(), 3000);
+    return () => {
+      stop = true;
+      clearInterval(t);
+    };
+  }, [polling, isAdmin]);
+
   useEffect(() => {
     let cancelled = false;
     if (state.qr && state.status !== "conectado") {
@@ -81,8 +113,19 @@ export function ConnectionPanel({ initial, isAdmin, tenantId, compact = false }:
     start(async () => {
       const r = await fn();
       setError(r.error ?? null);
-      if (!r.error && fn === whatsappConnectAction) setState((s) => ({ ...s, status: s.status === "conectado" ? s.status : "conectando" }));
+      if (!r.error && (fn === whatsappConnectAction || fn === whatsappResetAction)) setState((s) => ({ ...s, status: s.status === "conectado" ? s.status : "conectando" }));
     });
+
+  // "Conectando" por muito tempo sem QR: oferece recomeçar o pareamento.
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    if (state.status !== "conectando") return;
+    const t = setTimeout(() => setSlow(true), 45_000);
+    return () => {
+      clearTimeout(t);
+      setSlow(false);
+    };
+  }, [state.status]);
 
   const StatusIcon = state.status === "conectado" ? Wifi : state.status === "conectando" ? Loader2 : state.status === "aguardando_qr" ? QrCode : WifiOff;
 
@@ -124,15 +167,28 @@ export function ConnectionPanel({ initial, isAdmin, tenantId, compact = false }:
               {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <QrCode className="h-4 w-4" />} Conectar WhatsApp
             </button>
           ) : (
-            <button disabled={pending} onClick={() => run(whatsappDisconnectAction)} className="btn-secondary">
-              <WifiOff className="h-4 w-4" /> Desconectar
-            </button>
+            <div className="flex flex-wrap gap-2">
+              {state.status !== "conectado" && (
+                <button disabled={pending} onClick={() => run(whatsappResetAction)} className="btn-primary" title="Apaga o pareamento incompleto e gera um QR code novo">
+                  {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />} Gerar novo QR code
+                </button>
+              )}
+              <button disabled={pending} onClick={() => run(whatsappDisconnectAction)} className="btn-secondary">
+                <WifiOff className="h-4 w-4" /> Desconectar
+              </button>
+            </div>
           )
         ) : (
           <span className="chip"><Lock className="h-3 w-3" /> Somente administradores conectam o número</span>
         )}
       </div>
       {error && <p className="relative mt-3 text-sm text-danger">{error}</p>}
+      {isAdmin && slow && state.status === "conectando" && (
+        <p className="relative mt-3 rounded-xl bg-warning/10 p-3 text-sm text-warning">
+          Está demorando para aparecer o QR code. Clique em <strong>Gerar novo QR code</strong>. Se continuar assim por mais de 2 minutos,
+          o serviço de WhatsApp do servidor pode estar parado: fale com a CONNECTA.
+        </p>
+      )}
       {isAdmin && state.status === "aguardando_qr" && (
         <div className="relative mt-6 grid items-center gap-8 border-t border-line pt-6 md:grid-cols-[auto_1fr]">
           <div className="mx-auto rounded-2xl bg-white p-3 shadow-[0_0_48px_-8px_rgb(161_0_255/0.7)]">

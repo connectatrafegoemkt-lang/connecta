@@ -18,6 +18,7 @@ import type { ChatClient } from "../src/shared/ai/agent";
 import { AiResponder } from "./ai-responder";
 import { adSourceLabel, extractAdReferral } from "./ad-referral";
 import { onLabelEdit, processLabelQueue } from "./labels";
+import { currentWaVersion, disconnectMessage } from "./wa-version";
 
 /**
  * Uma conexão WhatsApp de UM tenant. Cada instância tem seu próprio socket,
@@ -46,10 +47,19 @@ export class TenantSession {
     return this.repo.tenantId;
   }
 
+  /** Quando esta sessão começou (para saber se um "gerar novo QR" é mais novo). */
+  startedAt = 0;
+  /** Quedas seguidas antes de chegar ao QR ou conectar (pareamento travado). */
+  private failuresBeforeQr = 0;
+
   async start() {
     this.stopped = false;
+    if (!this.startedAt) this.startedAt = Date.now();
     const { state, saveCreds } = await loadTenantAuthState(this.repo, this.cipher);
+    const version = await currentWaVersion(this.log);
+    let reachedQrOrOpen = false;
     const sock = makeWASocket({
+      ...(version ? { version } : {}),
       auth: { creds: state.creds, keys: makeCacheableSignalKeyStore(state.keys, this.log) },
       logger: this.log,
       browser: Browsers.ubuntu("CONNECTA CRM"),
@@ -57,7 +67,8 @@ export class TenantSession {
       syncFullHistory: false,
     });
     this.sock = sock;
-    await this.repo.setSession({ status: "conectando", last_error: null });
+    // Não apaga o último erro aqui: ele continua visível até conectar ou gerar o QR.
+    await this.repo.setSession({ status: "conectando" });
 
     sock.ev.on("creds.update", () => {
       saveCreds().catch((e) => this.log.error({ err: e }, "falha ao salvar credenciais"));
@@ -66,10 +77,14 @@ export class TenantSession {
     sock.ev.on("connection.update", async (u) => {
       try {
         if (u.qr) {
+          reachedQrOrOpen = true;
+          this.failuresBeforeQr = 0;
           await this.repo.setQr(u.qr);
-          await this.repo.setSession({ status: "aguardando_qr" });
+          await this.repo.setSession({ status: "aguardando_qr", last_error: null });
         }
         if (u.connection === "open") {
+          reachedQrOrOpen = true;
+          this.failuresBeforeQr = 0;
           this.connected = true;
           this.retries = 0;
           await this.repo.setQr(null);
@@ -102,8 +117,17 @@ export class TenantSession {
           }
           if (!this.stopped) {
             this.retries += 1;
-            const wait = Math.min(30_000, 1000 * 2 ** Math.min(this.retries, 5));
-            await this.repo.setSession({ status: "conectando", last_error: `Reconectando (código ${code ?? "?"})` });
+            if (!reachedQrOrOpen) this.failuresBeforeQr += 1;
+            this.log.warn({ code, retries: this.retries, failuresBeforeQr: this.failuresBeforeQr }, "conexão do WhatsApp caiu");
+            // Pareamento travado (nunca chegou ao QR) ou sessão corrompida:
+            // apaga as credenciais incompletas e recomeça do zero (novo QR).
+            if (code === 500 || (!state.creds.registered && this.failuresBeforeQr >= 3)) {
+              this.failuresBeforeQr = 0;
+              await this.repo.clearAuth().catch(() => undefined);
+              this.log.warn("pareamento reiniciado (credenciais incompletas apagadas)");
+            }
+            const wait = code === 515 ? 1000 : Math.min(30_000, 1000 * 2 ** Math.min(this.retries, 5));
+            await this.repo.setSession({ status: "conectando", last_error: disconnectMessage(code) });
             setTimeout(() => {
               if (!this.stopped) this.start().catch((e) => this.log.error({ err: e }, "falha ao reconectar"));
             }, wait);
