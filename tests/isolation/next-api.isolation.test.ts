@@ -274,6 +274,13 @@ describe.skipIf(!enabled)("isolamento via API do app (Next.js)", () => {
     const c = createClient(URL!, ANON!, opts);
     const { data: s } = await c.auth.signInWithPassword({ email, password });
     const at = { ...A, token: s.session!.access_token };
+    // senha provisória: o login novo vem marcado para trocar a senha (só o service_role mexe nessa marca)
+    const claims = JSON.parse(Buffer.from(at.token.split(".")[1]!, "base64url").toString());
+    expect(claims.app_metadata?.must_change_password).toBe(true);
+    const tamper = await c.auth.updateUser({ data: { must_change_password: false } });
+    expect(tamper.error).toBeNull();
+    const { data: after } = await admin.auth.admin.getUserById(inv.body.user_id as string);
+    expect(after.user?.app_metadata?.must_change_password).toBe(true);
     const me = await api(at, "/api/me");
     expect(me.body.tenant_id).toBe(A.tenantId);
     expect(me.body.profile).toBe("atendente");

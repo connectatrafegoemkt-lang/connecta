@@ -19,6 +19,7 @@ export const TENANT_TABLES = [
   "quick_replies",
   "departments",
   "member_departments",
+  "contact_fields",
   // whatsapp_auth_keys fica DE FORA de propósito: só o worker acessa.
 ] as const;
 export type TenantTable = (typeof TENANT_TABLES)[number];
@@ -78,7 +79,11 @@ export class TenantDb {
   rpc(fn: "dashboard_summary"): ReturnType<SupabaseClient["rpc"]>;
   rpc(fn: "whatsapp_request", args: { p_action: "conectar" | "desconectar" }): ReturnType<SupabaseClient["rpc"]>;
   rpc(fn: "ai_usage_summary"): ReturnType<SupabaseClient["rpc"]>;
-  rpc(fn: "dashboard_summary" | "whatsapp_request" | "ai_usage_summary", args?: Record<string, unknown>) {
+  rpc(fn: "apply_niche_setup", args: { p_niche: string | null; p_setup: Record<string, unknown> }): ReturnType<SupabaseClient["rpc"]>;
+  rpc(
+    fn: "dashboard_summary" | "whatsapp_request" | "ai_usage_summary" | "apply_niche_setup",
+    args?: Record<string, unknown>,
+  ) {
     return this.sb.rpc(fn, args);
   }
 

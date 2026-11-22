@@ -13,6 +13,8 @@ import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { brl, dateTime, phoneFmt } from "@/components/format";
 import { createContactAction } from "../actions";
+import { listContactFields } from "@/server/data/contact-fields";
+import { CustomFieldInputs } from "@/components/custom-field-inputs";
 
 export const metadata = { title: "Contatos" };
 
@@ -29,11 +31,12 @@ export default async function ContatosPage({ searchParams }: PageProps<"/contato
   const str = (v: unknown) => (typeof v === "string" && v ? v : undefined);
   const parsed = contactListQuerySchema.safeParse({ q: str(sp.q), stage_id: str(sp.etapa), tag_id: str(sp.tag), department_id: str(sp.setor) });
   const filters = parsed.success ? parsed.data : { limit: 50, offset: 0 };
-  const [{ items, total }, stages, tags, allDepartments] = await Promise.all([
+  const [{ items, total }, stages, tags, allDepartments, fields] = await Promise.all([
     listContacts(ctx, filters),
     listStages(ctx),
     listTags(ctx),
     listDepartments(ctx),
+    listContactFields(ctx),
   ]);
   const stageById = new Map(stages.map((s) => [s.id, s]));
   const deptById = new Map(allDepartments.map((d) => [d.id, d]));
@@ -84,6 +87,7 @@ export default async function ContatosPage({ searchParams }: PageProps<"/contato
               {tags.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
             </select>
           </label>
+          {fields.length > 0 && <CustomFieldInputs fields={fields} className="contents" />}
           <label className="md:col-span-3"><span className="label">Observações</span><textarea name="notes" rows={2} className="input" /></label>
         </ActionForm>
       </details>

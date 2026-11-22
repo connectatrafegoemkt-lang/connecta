@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { PERMISSION_KEYS, type Permission } from "@/shared/permissions";
+import { FIELD_TYPES, NICHE_KEYS, SETUP_GROUPS } from "@/shared/niches";
 
 /**
  * Schemas de entrada das APIs/Server Actions.
@@ -34,6 +35,11 @@ export const contactCreateSchema = z.strictObject({
   owner_id: uuid.nullable().optional(),
   department_id: uuid.nullable().optional(),
   tag_ids: z.array(uuid).max(50).optional(),
+  /** Campos extras da ficha; validados contra contact_fields do tenant no servidor. */
+  custom_fields: z
+    .record(z.string().regex(/^[a-z][a-z0-9_]{0,39}$/), z.union([z.string().max(1000), z.number(), z.boolean(), z.null()]))
+    .refine((o) => Object.keys(o).length <= 40, "Campos demais")
+    .optional(),
 });
 export const contactUpdateSchema = contactCreateSchema.partial();
 export type ContactCreate = z.infer<typeof contactCreateSchema>;
@@ -148,6 +154,8 @@ export const platformTenantCreateSchema = z.strictObject({
   admin_email: z.email(),
   admin_password: z.string().min(10).max(200),
   admin_name: z.string().trim().min(1).max(100),
+  /** Nicho pré-marcado para o assistente do primeiro acesso (opcional). */
+  niche: z.enum(NICHE_KEYS).optional().or(z.literal("").transform(() => undefined)),
 });
 
 export const platformSuspendSchema = z.strictObject({
@@ -157,4 +165,28 @@ export const platformSuspendSchema = z.strictObject({
 
 export const platformDeleteSchema = z.strictObject({
   confirmacao: z.string().trim().min(1).max(60),
+});
+
+// Troca de senha (própria) e redefinição de senha provisória
+const newPassword = z.string().min(10, "A senha precisa ter pelo menos 10 caracteres").max(200);
+export const passwordChangeSchema = z
+  .strictObject({ senha: newPassword, confirmacao: z.string().max(200) })
+  .refine((v) => v.senha === v.confirmacao, { message: "As senhas não conferem", path: ["confirmacao"] });
+export const passwordResetSchema = z.strictObject({ senha: newPassword });
+export const platformPasswordResetSchema = z.strictObject({ email: z.email(), senha: newPassword });
+
+// Assistente de primeiro acesso: só as RESPOSTAS vêm do front; o conteúdo
+// (etapas, etiquetas, textos) é montado no servidor a partir do modelo.
+export const nicheSetupSchema = z.strictObject({
+  niche: z.enum(NICHE_KEYS),
+  answers: z
+    .record(z.string().regex(/^[a-z_]{1,30}$/), z.union([z.string().max(600), z.array(z.string().max(40)).max(20)]))
+    .refine((o) => Object.keys(o).length <= 20, "Respostas demais"),
+  include: z.array(z.enum(SETUP_GROUPS)).max(SETUP_GROUPS.length),
+});
+
+export const contactFieldSchema = z.strictObject({
+  label: z.string().trim().min(1).max(60),
+  type: z.enum(FIELD_TYPES),
+  options: z.array(z.string().trim().min(1).max(60)).max(30).optional(),
 });

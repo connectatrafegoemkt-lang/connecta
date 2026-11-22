@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { Building, Plus, ShieldCheck, Trash2, UserCog, UserPlus, UserRound, Users } from "lucide-react";
+import { Building, KeyRound, Plus, ShieldCheck, Trash2, UserCog, UserPlus, UserRound, Users } from "lucide-react";
 import { can, getTenantContext } from "@/server/context";
 import { listMembers } from "@/server/data/members";
 import { listDepartments } from "@/server/data/departments";
@@ -11,6 +11,7 @@ import {
   deleteDepartmentAction,
   inviteMemberAction,
   removeMemberAction,
+  resetMemberPasswordAction,
   updateMemberAction,
 } from "../actions";
 import { AccessFields } from "./access-fields";
@@ -105,6 +106,14 @@ export default async function EquipePage() {
                           allowAdmin={isAdmin}
                         />
                       </ActionForm>
+                      <div className="mt-4 rounded-xl border border-line bg-surface-2/40 p-3">
+                        <p className="flex items-center gap-1.5 text-sm font-medium"><KeyRound className="h-4 w-4 text-accent" /> Redefinir senha</p>
+                        <p className="mt-0.5 text-xs text-muted">Defina uma senha provisória. No próximo acesso, a pessoa entra com ela e cria a própria senha.</p>
+                        <ActionForm action={resetMemberPasswordAction} resetOnSuccess className="mt-2 flex flex-wrap items-center gap-2" submitLabel="Definir senha provisória" submitClassName="btn-secondary btn-sm">
+                          <input type="hidden" name="id" value={m.id} />
+                          <input name="senha" type="text" required minLength={10} maxLength={200} autoComplete="off" placeholder="Senha provisória (10+)" className="input max-w-xs py-1.5 text-sm" aria-label="Senha provisória" />
+                        </ActionForm>
+                      </div>
                       <ActionForm action={removeMemberAction} className="mt-3" submitLabel="Remover da equipe" submitIcon={<Trash2 className="h-3.5 w-3.5" />} submitClassName="btn-danger btn-sm">
                         <input type="hidden" name="id" value={m.id} />
                       </ActionForm>
@@ -123,8 +132,9 @@ export default async function EquipePage() {
           <div className="grid gap-2 md:grid-cols-3">
             <input name="display_name" required maxLength={100} placeholder="Nome" className="input" aria-label="Nome" />
             <input name="email" type="email" required placeholder="E-mail" className="input" aria-label="E-mail" />
-            <input name="password" type="password" required minLength={10} placeholder="Senha inicial (10+)" className="input" aria-label="Senha inicial" />
+            <input name="password" type="password" required minLength={10} placeholder="Senha provisória (10+)" className="input" aria-label="Senha provisória" />
           </div>
+          <p className="text-xs text-muted">No primeiro acesso, a pessoa entra com essa senha provisória e é levada a criar a senha pessoal dela.</p>
           <AccessFields idPrefix="novo" departments={departments} grantable={grantable} allowAdmin={isAdmin} />
         </ActionForm>
       </section>

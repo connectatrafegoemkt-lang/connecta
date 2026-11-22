@@ -2,6 +2,8 @@ import "server-only";
 import { can, type TenantContext } from "../context";
 import { badRequest, fromDbError, notFound } from "../errors";
 import type { ContactCreate, ContactUpdate } from "../validation";
+import { sanitizeCustomFields } from "@/shared/custom-fields";
+import { listContactFields } from "./contact-fields";
 
 export interface Contact {
   id: string;
@@ -23,13 +25,14 @@ export interface Contact {
   avatar_path?: string | null;
   whatsapp_name?: string | null;
   whatsapp_about?: string | null;
+  custom_fields?: Record<string, unknown>;
   created_at: string;
   updated_at: string;
   tags?: { id: string; name: string; color: string }[];
 }
 
 const COLUMNS =
-  "id, tenant_id, name, email, phone, company, source, notes, value_cents, stage_id, stage_position, owner_id, department_id, last_interaction_at, ai_enabled, ai_paused_until, avatar_path, whatsapp_name, whatsapp_about, created_at, updated_at";
+  "id, tenant_id, name, email, phone, company, source, notes, value_cents, stage_id, stage_position, owner_id, department_id, last_interaction_at, ai_enabled, ai_paused_until, avatar_path, whatsapp_name, whatsapp_about, custom_fields, created_at, updated_at";
 const WITH_TAGS = `${COLUMNS}, contact_tags(tags(id, name, color))`;
 
 type RawContact = Contact & { contact_tags?: { tags: { id: string; name: string; color: string } | null }[] };
@@ -100,9 +103,19 @@ async function assertOwnTags(ctx: TenantContext, tagIds: string[] | undefined) {
   if (count !== unique.length) throw badRequest("Tag inválida");
 }
 
+/** Valida os campos extras contra os definidos pelo tenant (contact_fields). */
+async function customFieldsFor(ctx: TenantContext, input: Record<string, unknown>, current: Record<string, unknown> = {}) {
+  const defs = await listContactFields(ctx);
+  const { values, errors } = sanitizeCustomFields(defs, input, current);
+  if (errors.length) throw badRequest(errors.join("; "));
+  return values;
+}
+
 export async function createContact(ctx: TenantContext, input: ContactCreate): Promise<Contact> {
-  const { tag_ids, ...fields } = input;
+  const { tag_ids, custom_fields, ...rest } = input;
+  const fields: Record<string, unknown> & typeof rest = { ...rest };
   await assertOwnTags(ctx, tag_ids);
+  if (custom_fields) fields.custom_fields = await customFieldsFor(ctx, custom_fields);
   // Quem só enxerga os próprios setores cria o contato no seu (primeiro) setor,
   // senão o contato ficaria "sem setor" e visível a todos.
   if (fields.department_id === undefined && !can(ctx, "setores.todos") && ctx.departmentIds.length) {
@@ -120,8 +133,13 @@ export async function createContact(ctx: TenantContext, input: ContactCreate): P
 }
 
 export async function updateContact(ctx: TenantContext, id: string, input: ContactUpdate): Promise<Contact> {
-  const { tag_ids, ...fields } = input;
+  const { tag_ids, custom_fields, ...rest } = input;
+  const fields: Record<string, unknown> & typeof rest = { ...rest };
   await assertOwnTags(ctx, tag_ids);
+  if (custom_fields) {
+    const current = await getContact(ctx, id);
+    fields.custom_fields = await customFieldsFor(ctx, custom_fields, current.custom_fields ?? {});
+  }
   if (Object.keys(fields).length > 0) {
     const { data, error } = await ctx.db.update("contacts", fields).eq("id", id).select("id");
     if (error) throw fromDbError(error);
