@@ -56,6 +56,10 @@ Realtime), Tailwind CSS.
    `app.has_perm()` no banco e `requirePerm()`/`can()` no app. Setores
    (`departments`, `member_departments`) limitam a visibilidade de contatos
    via `app.can_see_department()`/`app.can_see_contact()`.
+   Senha provisória: todo login criado (Painel ou Equipe) recebe
+   `app_metadata.must_change_password` e o `src/proxy.ts` leva para
+   `/trocar-senha` até a troca. Só o service_role altera app_metadata
+   (`src/server/admin/passwords.ts`, exposto via `src/server/account.ts`).
 8. Auditoria: tabela `audit_logs` com `tenant_id` e `user_id`, preenchida por
    triggers (não depende do app lembrar de registrar).
 9. Testes de isolamento (`tests/isolation/`) rodam em todo PR. Qualquer nova
