@@ -16,6 +16,7 @@ import { listTags } from "@/server/data/tags";
 import { listStages } from "@/server/data/stages";
 import { listDepartments } from "@/server/data/departments";
 import { listTasks } from "@/server/data/tasks";
+import { listContactFields } from "@/server/data/contact-fields";
 import { isAiPaused } from "@/shared/ai/hours";
 import { phoneFmt } from "@/components/format";
 import { Avatar } from "@/components/avatar";
@@ -60,16 +61,18 @@ export default async function WhatsappPage({ searchParams }: PageProps<"/whatsap
   let stages: Awaited<ReturnType<typeof listStages>> = [];
   let departments: Awaited<ReturnType<typeof listDepartments>> = [];
   let tasks: Awaited<ReturnType<typeof listTasks>> = [];
+  let fields: Awaited<ReturnType<typeof listContactFields>> = [];
   if (selected) {
     try {
       contact = await getContact(ctx, selected);
-      [thread, pending, suggestion, stages, departments, tasks] = await Promise.all([
+      [thread, pending, suggestion, stages, departments, tasks, fields] = await Promise.all([
         listThread(ctx, selected),
         listPendingOutbox(ctx, selected),
         aiSettings.mode === "sugerir" ? listPendingSuggestion(ctx, selected) : Promise.resolve(null),
         listStages(ctx),
         listDepartments(ctx),
         can(ctx, "tarefas.editar") || can(ctx, "contatos.ver") ? listTasks(ctx, { contact_id: selected }) : Promise.resolve([]),
+        listContactFields(ctx),
       ]);
       if (contact.avatar_path) avatarUrl = (await signedUrlsFor(ctx, [contact.avatar_path])).get(contact.avatar_path) ?? null;
     } catch {
@@ -153,7 +156,9 @@ export default async function WhatsappPage({ searchParams }: PageProps<"/whatsap
                     whatsapp_name: contact.whatsapp_name ?? null,
                     whatsapp_about: contact.whatsapp_about ?? null,
                     tags: contact.tags ?? [],
+                    custom_fields: contact.custom_fields ?? {},
                   }}
+                  fields={fields}
                   stages={stages.map((s) => ({ id: s.id, name: s.name }))}
                   departments={departments.map((d) => ({ id: d.id, name: d.name }))}
                   tasks={tasks.map((t) => ({ id: t.id, title: t.title, status: t.status, due_at: t.due_at }))}
