@@ -30,6 +30,15 @@ export async function proxy(request: NextRequest) {
   const isApi = path.startsWith("/api/");
   const isPublic = PUBLIC_PATHS.some((p) => path === p || path.startsWith(`${p}/`));
 
+  // Senha provisória: até trocar, o usuário só acessa a tela de troca.
+  const mustChange = (data?.claims?.app_metadata as Record<string, unknown> | undefined)?.must_change_password === true;
+  if (data?.claims && mustChange && !isApi && !isPublic && path !== "/trocar-senha") {
+    const to = request.nextUrl.clone();
+    to.pathname = "/trocar-senha";
+    to.search = "";
+    return NextResponse.redirect(to);
+  }
+
   if (!data?.claims && !isApi && !isPublic) {
     const login = request.nextUrl.clone();
     login.pathname = "/login";

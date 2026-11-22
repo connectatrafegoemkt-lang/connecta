@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import { CalendarClock, Check, ExternalLink, UserRound, Loader2, Plus, RotateCcw, Save, TriangleAlert, X } from "lucide-react";
 import { Avatar } from "@/components/avatar";
 import { dateTime, phoneFmt } from "@/components/format";
+import { CustomFieldInputs } from "@/components/custom-field-inputs";
+import type { ContactFieldDef } from "@/shared/custom-fields";
 import { createTaskAction, setTaskStatusAction, updateContactAction } from "../actions";
 
 export interface DrawerContact {
@@ -23,6 +25,7 @@ export interface DrawerContact {
   whatsapp_name: string | null;
   whatsapp_about: string | null;
   tags: { id: string; name: string; color: string }[];
+  custom_fields: Record<string, unknown>;
 }
 
 type Opt = { id: string; name: string; color?: string };
@@ -36,6 +39,7 @@ export function LeadDrawer({
   stages,
   departments,
   tasks,
+  fields = [],
   canEdit,
   canTasks,
   allSectors,
@@ -47,6 +51,8 @@ export function LeadDrawer({
   stages: Opt[];
   departments: Opt[];
   tasks: { id: string; title: string; status: string; due_at: string | null }[];
+  /** Campos extras da ficha do lead (do nicho do cliente). */
+  fields?: ContactFieldDef[];
   canEdit: boolean;
   canTasks: boolean;
   allSectors: boolean;
@@ -167,6 +173,12 @@ export function LeadDrawer({
                           {deptOptions.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
                         </select>
                       </label>
+                    )}
+                    {fields.length > 0 && (
+                      <div className="rounded-xl border border-line p-3">
+                        <p className="mb-2 text-xs font-semibold text-muted">Informações do lead</p>
+                        <CustomFieldInputs fields={fields} values={contact.custom_fields} labelClassName={label} />
+                      </div>
                     )}
                     <label className="block"><span className={label}>Observações</span><textarea name="notes" defaultValue={contact.notes ?? ""} rows={3} className="input" /></label>
                     {canEdit && (

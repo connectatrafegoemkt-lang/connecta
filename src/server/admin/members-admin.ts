@@ -4,6 +4,7 @@ import { badRequest, fromDbError } from "../errors";
 import { assertOwnDepartments, setMemberDepartments } from "../data/members";
 import type { Permission, Profile } from "@/shared/permissions";
 import { supabaseAdmin } from "./supabase-admin";
+import { MUST_CHANGE } from "./passwords";
 
 /**
  * Cria um usuário na empresa DA SESSÃO de quem convida.
@@ -32,6 +33,7 @@ export async function inviteMember(
     email: input.email,
     password: input.password,
     email_confirm: true,
+    app_metadata: MUST_CHANGE, // senha provisória: troca obrigatória no 1º acesso
   });
   if (error || !data.user) {
     throw badRequest("Não foi possível criar o usuário (e-mail já cadastrado?)");

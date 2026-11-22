@@ -21,7 +21,13 @@ import {
   taskUpdateSchema,
   whatsappSendSchema,
   quickReplySchema,
+  passwordResetSchema,
+  contactFieldSchema,
+  nicheSetupSchema,
 } from "@/server/validation";
+import { resetMemberPassword } from "@/server/account";
+import { createContactField, deleteContactField } from "@/server/data/contact-fields";
+import { applyNicheSetup, skipNicheSetup } from "@/server/data/onboarding";
 import { createContact, deleteContact, moveContact, updateContact } from "@/server/data/contacts";
 import { createInteraction, deleteInteraction } from "@/server/data/interactions";
 import { createTask, deleteTask, updateTask } from "@/server/data/tasks";
@@ -48,6 +54,12 @@ function contactInput(fd: FormData) {
   if (cents !== undefined) raw.value_cents = cents;
   if (raw.stage_id === "") raw.stage_id = null;
   if (raw.department_id === "") raw.department_id = null;
+  // Campos extras da ficha: inputs "cf.<chave>" (validados contra contact_fields no servidor)
+  const custom: Record<string, string> = {};
+  for (const [k, v] of fd.entries()) {
+    if (k.startsWith("cf.") && typeof v === "string") custom[k.slice(3)] = v;
+  }
+  if (Object.keys(custom).length) raw.custom_fields = custom;
   return raw;
 }
 
@@ -257,6 +269,18 @@ export async function removeMemberAction(_: ActionState, fd: FormData): Promise<
   }
 }
 
+export async function resetMemberPasswordAction(_: ActionState, fd: FormData): Promise<ActionState> {
+  try {
+    const ctx = await getTenantContext();
+    const id = parseOrThrow(idSchema, fd.get("id"));
+    const { senha } = parseOrThrow(passwordResetSchema, pick(fd, ["senha"]));
+    await resetMemberPassword(ctx, id, senha);
+    return { ok: true, message: "Senha provisória definida. A pessoa vai criar a senha dela no próximo acesso." };
+  } catch (e) {
+    return toActionError(e);
+  }
+}
+
 // ---------------------------------------------------------------- Setores
 
 export async function createDepartmentAction(_: ActionState, fd: FormData): Promise<ActionState> {
@@ -396,6 +420,56 @@ export async function setContactTagsAction(contactId: string, tagIds: string[]):
     const input = parseOrThrow(contactUpdateSchema, { tag_ids: Array.isArray(tagIds) ? tagIds : [] });
     await updateContact(ctx, parseOrThrow(idSchema, contactId), input);
     revalidatePath("/whatsapp");
+    return { ok: true };
+  } catch (e) {
+    return toActionError(e);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Campos extras da ficha do lead
+// ---------------------------------------------------------------------------
+
+export async function createContactFieldAction(_: ActionState, fd: FormData): Promise<ActionState> {
+  try {
+    const ctx = await getTenantContext();
+    const raw: Record<string, unknown> = pick(fd, ["label", "type"]);
+    const opts = String(fd.get("options") ?? "");
+    if (raw.type === "opcoes") raw.options = opts.split(/[,;\n]/).map((o) => o.trim()).filter(Boolean);
+    await createContactField(ctx, parseOrThrow(contactFieldSchema, raw));
+    revalidatePath("/configuracoes");
+    return { ok: true, message: "Campo criado." };
+  } catch (e) {
+    return toActionError(e);
+  }
+}
+
+export async function deleteContactFieldAction(fd: FormData) {
+  const ctx = await getTenantContext();
+  await deleteContactField(ctx, parseOrThrow(idSchema, fd.get("id")));
+  revalidatePath("/configuracoes");
+}
+
+// ---------------------------------------------------------------------------
+// Assistente de primeiro acesso (nicho)
+// ---------------------------------------------------------------------------
+
+export async function applyNicheSetupAction(input: unknown): Promise<ActionState & { result?: Record<string, number | boolean> }> {
+  try {
+    const ctx = await getTenantContext();
+    const result = await applyNicheSetup(ctx, parseOrThrow(nicheSetupSchema, input));
+    revalidatePath("/", "layout");
+    return { ok: true, result };
+  } catch (e) {
+    return toActionError(e);
+  }
+}
+
+export async function skipNicheSetupAction(): Promise<ActionState> {
+  try {
+    const ctx = await getTenantContext();
+    await skipNicheSetup(ctx);
+    revalidatePath("/", "layout");
     return { ok: true };
   } catch (e) {
     return toActionError(e);

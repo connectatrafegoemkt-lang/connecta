@@ -1,8 +1,10 @@
 import "server-only";
+import type { NicheKey } from "@/shared/niches";
 import { randomBytes } from "node:crypto";
 import { badRequest, HttpError } from "../errors";
 import type { PlatformContext } from "../platform";
 import { supabaseAdmin } from "./supabase-admin";
+import { MUST_CHANGE } from "./passwords";
 
 export function slugify(name: string): string {
   return name
@@ -22,7 +24,7 @@ export function slugify(name: string): string {
  */
 export async function createClientTenant(
   _p: PlatformContext,
-  input: { name: string; slug?: string; admin_email: string; admin_password: string; admin_name: string },
+  input: { name: string; slug?: string; admin_email: string; admin_password: string; admin_name: string; niche?: NicheKey },
 ) {
   if (_p?.kind !== "platform") throw new HttpError(403, "Apenas a equipe CONNECTA");
   const admin = supabaseAdmin();
@@ -37,6 +39,7 @@ export async function createClientTenant(
     email: input.admin_email,
     password: input.admin_password,
     email_confirm: true,
+    app_metadata: MUST_CHANGE, // senha provisória: troca obrigatória no 1º acesso
   });
   if (error || !u.user) throw badRequest("Não foi possível criar o login (e-mail já cadastrado?)");
 
@@ -50,6 +53,10 @@ export async function createClientTenant(
     await admin.auth.admin.deleteUser(u.user.id);
     if (e2.code === "23505") throw badRequest("Esse endereço (slug) já está em uso. Escolha outro.");
     throw new HttpError(500, "Falha ao criar o cliente");
+  }
+  if (input.niche) {
+    // Só pré-marca o nicho do tenant recém-criado (id vindo do próprio banco).
+    await admin.from("tenants").update({ niche: input.niche }).eq("id", tenantId as string);
   }
   return { tenant_id: tenantId as string, slug };
 }
