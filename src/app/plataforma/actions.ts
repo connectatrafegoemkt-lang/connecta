@@ -10,7 +10,7 @@ export async function createClientTenantAction(_: ActionState, fd: FormData): Pr
     const p = await getPlatformContext();
     const input = parseOrThrow(
       platformTenantCreateSchema,
-      pick(fd, ["name", "slug", "admin_email", "admin_password", "admin_name"]),
+      pick(fd, ["name", "slug", "admin_email", "admin_password", "admin_name", "niche"]),
     );
     await createClientTenant(p, input);
     revalidatePath("/plataforma");
