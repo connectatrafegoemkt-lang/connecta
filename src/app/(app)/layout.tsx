@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { Building2, LayoutGrid, LogOut, ShieldCheck, UserRound } from "lucide-react";
+import { Building2, KeyRound, LayoutGrid, LogOut, ShieldCheck, UserRound } from "lucide-react";
 import { can, getTenantContext } from "@/server/context";
 import { profileLabel } from "@/shared/permissions";
 import { isPlatformAdmin } from "@/server/platform";
@@ -128,6 +128,9 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
                 {profileLabel(ctx.profile)}
               </p>
             </div>
+            <Link href="/trocar-senha" className="icon-btn" title="Trocar senha" aria-label="Trocar senha">
+              <KeyRound className="h-4 w-4" />
+            </Link>
             <form action="/auth/signout" method="post">
               <button className="icon-btn" title="Sair" aria-label="Sair">
                 <LogOut className="h-4 w-4" />
