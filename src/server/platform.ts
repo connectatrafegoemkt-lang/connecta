@@ -48,6 +48,19 @@ export interface ClientTenant {
   ai_tokens_month: number;
   suspended_at: string | null;
   suspended_reason: string | null;
+  whatsapp_numbers: number;
+  whatsapp_connected: number;
+  whatsapp_limit: number;
+}
+
+/** Quantos números de WhatsApp o cliente pode conectar (1 a 20). */
+export async function setWhatsappLimit(p: PlatformContext, tenantId: string, limit: number) {
+  const { error } = await p.supabase.rpc("platform_set_whatsapp_limit", { p_tenant: tenantId, p_limit: limit });
+  if (error) {
+    if (error.code === "P0002") throw notFound("Cliente não encontrado");
+    if (error.code === "22023") throw badRequest("Limite inválido (1 a 20)");
+    throw fromDbError(error);
+  }
 }
 
 /** Só metadados dos clientes; a autorização é refeita dentro da função do banco. */

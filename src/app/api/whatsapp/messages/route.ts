@@ -3,6 +3,6 @@ import { whatsappSendSchema } from "@/server/validation";
 import { queueWhatsappMessage } from "@/server/data/whatsapp";
 
 export const POST = withTenant(async (req, ctx) => {
-  const { contact_id, body } = await readJson(req, whatsappSendSchema);
-  return Response.json(await queueWhatsappMessage(ctx, contact_id, body), { status: 202 });
+  const { contact_id, body, session_id } = await readJson(req, whatsappSendSchema);
+  return Response.json(await queueWhatsappMessage(ctx, contact_id, body, session_id), { status: 202 });
 });

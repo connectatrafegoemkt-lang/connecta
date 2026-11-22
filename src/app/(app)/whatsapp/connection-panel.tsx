@@ -33,7 +33,25 @@ const TONE: Record<Status, string> = {
  * Status e QR em tempo real. O QR chega por Realtime da tabela whatsapp_qr,
  * cujo RLS só entrega linhas ao ADMIN do próprio tenant.
  */
-export function ConnectionPanel({ initial, isAdmin, tenantId, compact = false }: { initial: State; isAdmin: boolean; tenantId: string; compact?: boolean }) {
+export function ConnectionPanel({
+  initial,
+  isAdmin,
+  tenantId,
+  sessionId,
+  label,
+  showLabel = false,
+  compact = false,
+}: {
+  initial: State;
+  isAdmin: boolean;
+  tenantId: string;
+  /** Número (sessão) que este painel mostra. */
+  sessionId: string | null;
+  label?: string;
+  /** Mostrar o nome do número (quando o cliente tem mais de um). */
+  showLabel?: boolean;
+  compact?: boolean;
+}) {
   const [state, setState] = useState(initial);
   const [qrSvg, setQrSvg] = useState<string | null>(null);
   const [pending, start] = useTransition();
@@ -42,25 +60,30 @@ export function ConnectionPanel({ initial, isAdmin, tenantId, compact = false }:
   useEffect(() => {
     const sb = supabaseBrowser();
     const ch = sb
-      .channel(`wa-session-${tenantId}`)
+      .channel(`wa-session-${tenantId}-${sessionId ?? "principal"}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "whatsapp_sessions", filter: `tenant_id=eq.${tenantId}` },
         (p) => {
-          const row = p.new as Partial<State>;
+          const row = p.new as Partial<State> & { id?: string };
+          if (sessionId && row.id && row.id !== sessionId) return;
           setState((s) => ({ ...s, status: (row.status as Status) ?? s.status, phone: row.phone ?? null, last_error: row.last_error ?? null }));
         },
       )
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "whatsapp_qr", filter: `tenant_id=eq.${tenantId}` },
-        (p) => setState((s) => ({ ...s, qr: (p.new as { qr?: string | null }).qr ?? null })),
+        (p) => {
+          const row = p.new as { qr?: string | null; session_id?: string };
+          if (sessionId && row.session_id && row.session_id !== sessionId) return;
+          setState((s) => ({ ...s, qr: row.qr ?? null }));
+        },
       )
       .subscribe();
     return () => {
       sb.removeChannel(ch);
     };
-  }, [tenantId]);
+  }, [tenantId, sessionId]);
 
   // Reserva do tempo real: enquanto não estiver conectado, consulta o status e
   // o QR a cada 3 s (o QR muda a cada ~20 s). Sem isso, se o Realtime falhar,
@@ -74,7 +97,8 @@ export function ConnectionPanel({ initial, isAdmin, tenantId, compact = false }:
       try {
         const res = await fetch("/api/whatsapp/status", { cache: "no-store" });
         if (!res.ok || stop) return;
-        const j = (await res.json()) as Partial<State>;
+        const all = (await res.json()) as Partial<State> & { numbers?: (Partial<State> & { id: string })[] };
+        const j = (sessionId ? all.numbers?.find((n) => n.id === sessionId) : all) ?? all;
         setState((s) => ({
           ...s,
           status: (j.status as Status) ?? s.status,
@@ -92,7 +116,7 @@ export function ConnectionPanel({ initial, isAdmin, tenantId, compact = false }:
       stop = true;
       clearInterval(t);
     };
-  }, [polling, isAdmin]);
+  }, [polling, isAdmin, sessionId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -111,7 +135,7 @@ export function ConnectionPanel({ initial, isAdmin, tenantId, compact = false }:
 
   const run = (fn: typeof whatsappConnectAction) =>
     start(async () => {
-      const r = await fn();
+      const r = await fn(sessionId);
       setError(r.error ?? null);
       if (!r.error && (fn === whatsappConnectAction || fn === whatsappResetAction)) setState((s) => ({ ...s, status: s.status === "conectado" ? s.status : "conectando" }));
     });
@@ -133,9 +157,12 @@ export function ConnectionPanel({ initial, isAdmin, tenantId, compact = false }:
   if (compact && state.status === "conectado") {
     return (
       <div className="flex items-center justify-between gap-3 px-4 py-2 text-xs" style={{ background: "var(--wa-panel)" }}>
-        <span className="flex items-center gap-1.5 text-muted">
-          <Wifi className="h-3.5 w-3.5" style={{ color: "var(--wa-green)" }} />
-          Conectado{state.phone ? ` · +${state.phone}` : ""}
+        <span className="flex min-w-0 items-center gap-1.5 text-muted">
+          <Wifi className="h-3.5 w-3.5 shrink-0" style={{ color: "var(--wa-green)" }} />
+          <span className="truncate">
+            {showLabel && label ? <strong className="font-medium text-fg">{label}</strong> : "Conectado"}
+            {state.phone ? ` · +${state.phone}` : ""}
+          </span>
         </span>
         {isAdmin && (
           <button disabled={pending} onClick={() => run(whatsappDisconnectAction)} className="font-medium text-muted hover:text-danger">
@@ -155,7 +182,9 @@ export function ConnectionPanel({ initial, isAdmin, tenantId, compact = false }:
             <StatusIcon className={`h-5 w-5 ${state.status === "conectando" ? "animate-spin" : ""}`} />
           </span>
           <div>
-            <p className="text-xs font-medium uppercase tracking-wider text-subtle">Status da conexão</p>
+            <p className="text-xs font-medium uppercase tracking-wider text-subtle">
+              {showLabel && label ? `WhatsApp · ${label}` : "Status da conexão"}
+            </p>
             <p className="text-lg font-semibold">{LABEL[state.status]}</p>
             {state.phone && state.status === "conectado" && <p className="text-sm text-muted">Número conectado: +{state.phone}</p>}
             {state.last_error && state.status !== "conectado" && <p className="text-sm text-warning">{state.last_error}</p>}

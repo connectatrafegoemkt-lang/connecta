@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getPlatformContext, createClientTenant, deleteClientTenant, setAdSpend, setClientSuspended } from "@/server/platform";
+import { getPlatformContext, createClientTenant, deleteClientTenant, setAdSpend, setClientSuspended, setWhatsappLimit } from "@/server/platform";
 import { parseOrThrow, pick, reaisToCents, toActionError, type ActionState } from "@/server/forms";
 import { idSchema, platformPasswordResetSchema, platformTenantCreateSchema } from "@/server/validation";
 import { resetClientUserPassword } from "@/server/account";
@@ -72,6 +72,20 @@ export async function setAdSpendAction(_: ActionState, fd: FormData): Promise<Ac
     await setAdSpend(p, id, month, v);
     revalidatePath("/plataforma/relatorios");
     return { ok: true, message: "Investimento salvo." };
+  } catch (e) {
+    return toActionError(e);
+  }
+}
+
+export async function setWhatsappLimitAction(_: ActionState, fd: FormData): Promise<ActionState> {
+  try {
+    const p = await getPlatformContext();
+    const id = parseOrThrow(idSchema, fd.get("id"));
+    const limit = Number(fd.get("limite"));
+    if (!Number.isInteger(limit) || limit < 1 || limit > 20) return { ok: false, error: "Use um número de 1 a 20" };
+    await setWhatsappLimit(p, id, limit);
+    revalidatePath("/plataforma");
+    return { ok: true, message: "Limite salvo." };
   } catch (e) {
     return toActionError(e);
   }

@@ -22,6 +22,7 @@ import {
   whatsappSendSchema,
   quickReplySchema,
   passwordResetSchema,
+  whatsappNumberLabelSchema,
   contactFieldSchema,
   nicheSetupSchema,
 } from "@/server/validation";
@@ -35,7 +36,13 @@ import { createStage, deleteStage, reorderStages, updateStage } from "@/server/d
 import { createTag, deleteTag, setPaidTrafficTags } from "@/server/data/tags";
 import { inviteMember, removeMember, updateMember } from "@/server/data/members";
 import { createDepartment, deleteDepartment } from "@/server/data/departments";
-import { queueWhatsappMessage, requestWhatsapp } from "@/server/data/whatsapp";
+import {
+  addWhatsappNumber,
+  queueWhatsappMessage,
+  removeWhatsappNumber,
+  renameWhatsappNumber,
+  requestWhatsapp,
+} from "@/server/data/whatsapp";
 import { cancelScheduled, createQuickReply, deleteQuickReply, queueTextMessage } from "@/server/data/whatsapp-media";
 import { saveAiSettings, setContactAi, setSuggestionStatus, testAiReply } from "@/server/data/ai";
 
@@ -308,9 +315,10 @@ export async function deleteDepartmentAction(_: ActionState, fd: FormData): Prom
 
 // ---------------------------------------------------------------- WhatsApp
 
-export async function whatsappConnectAction(): Promise<ActionState> {
+export async function whatsappConnectAction(sessionId?: string | null): Promise<ActionState> {
   try {
-    await requestWhatsapp(await getTenantContext(), "conectar");
+    const id = sessionId ? parseOrThrow(idSchema, sessionId) : null;
+    await requestWhatsapp(await getTenantContext(), "conectar", id);
     revalidatePath("/whatsapp");
     return { ok: true };
   } catch (e) {
@@ -319,9 +327,10 @@ export async function whatsappConnectAction(): Promise<ActionState> {
 }
 
 /** "Gerar novo QR code": recomeça o pareamento do zero. */
-export async function whatsappResetAction(): Promise<ActionState> {
+export async function whatsappResetAction(sessionId?: string | null): Promise<ActionState> {
   try {
-    await requestWhatsapp(await getTenantContext(), "reiniciar");
+    const id = sessionId ? parseOrThrow(idSchema, sessionId) : null;
+    await requestWhatsapp(await getTenantContext(), "reiniciar", id);
     revalidatePath("/whatsapp");
     return { ok: true };
   } catch (e) {
@@ -329,9 +338,10 @@ export async function whatsappResetAction(): Promise<ActionState> {
   }
 }
 
-export async function whatsappDisconnectAction(): Promise<ActionState> {
+export async function whatsappDisconnectAction(sessionId?: string | null): Promise<ActionState> {
   try {
-    await requestWhatsapp(await getTenantContext(), "desconectar");
+    const id = sessionId ? parseOrThrow(idSchema, sessionId) : null;
+    await requestWhatsapp(await getTenantContext(), "desconectar", id);
     revalidatePath("/whatsapp");
     return { ok: true };
   } catch (e) {
@@ -342,10 +352,10 @@ export async function whatsappDisconnectAction(): Promise<ActionState> {
 export async function whatsappSendAction(_: ActionState, fd: FormData): Promise<ActionState> {
   try {
     const ctx = await getTenantContext();
-    const { contact_id, body } = parseOrThrow(whatsappSendSchema, pick(fd, ["contact_id", "body"]));
+    const { contact_id, body, session_id } = parseOrThrow(whatsappSendSchema, pick(fd, ["contact_id", "body", "session_id"]));
     const scheduled = localToIso(fd.get("scheduled_at"));
-    if (scheduled) await queueTextMessage(ctx, contact_id, body, scheduled);
-    else await queueWhatsappMessage(ctx, contact_id, body);
+    if (scheduled) await queueTextMessage(ctx, contact_id, body, scheduled, session_id);
+    else await queueWhatsappMessage(ctx, contact_id, body, session_id);
     revalidatePath("/whatsapp");
     return { ok: true, message: scheduled ? "Mensagem agendada." : null };
   } catch (e) {
@@ -495,6 +505,43 @@ export async function setPaidTrafficTagsAction(_: ActionState, fd: FormData): Pr
     await setPaidTrafficTags(ctx, ids.map((id) => parseOrThrow(idSchema, id)));
     revalidatePath("/configuracoes");
     return { ok: true, message: "Etiquetas de tráfego pago salvas." };
+  } catch (e) {
+    return toActionError(e);
+  }
+}
+
+// ------------------------------------------------------- números de WhatsApp
+export async function addWhatsappNumberAction(_: ActionState, fd: FormData): Promise<ActionState> {
+  try {
+    const ctx = await getTenantContext();
+    const { label } = parseOrThrow(whatsappNumberLabelSchema, pick(fd, ["label"]));
+    await addWhatsappNumber(ctx, label);
+    revalidatePath("/whatsapp");
+    return { ok: true, message: "Número adicionado. Leia o QR code com o celular desse número." };
+  } catch (e) {
+    return toActionError(e);
+  }
+}
+
+export async function renameWhatsappNumberAction(_: ActionState, fd: FormData): Promise<ActionState> {
+  try {
+    const ctx = await getTenantContext();
+    const id = parseOrThrow(idSchema, fd.get("id"));
+    const { label } = parseOrThrow(whatsappNumberLabelSchema, pick(fd, ["label"]));
+    await renameWhatsappNumber(ctx, id, label);
+    revalidatePath("/whatsapp");
+    return { ok: true, message: "Nome salvo." };
+  } catch (e) {
+    return toActionError(e);
+  }
+}
+
+export async function removeWhatsappNumberAction(_: ActionState, fd: FormData): Promise<ActionState> {
+  try {
+    const ctx = await getTenantContext();
+    await removeWhatsappNumber(ctx, parseOrThrow(idSchema, fd.get("id")));
+    revalidatePath("/whatsapp");
+    return { ok: true, message: "Número removido." };
   } catch (e) {
     return toActionError(e);
   }

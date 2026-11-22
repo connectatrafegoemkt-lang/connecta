@@ -29,6 +29,7 @@ const PHONE = `55119${Math.floor(10_000_000 + Math.random() * 89_999_999)}`;
 
 interface T {
   tenantId: string;
+  sessionId: string;
   userId: string;
   token: string;
   client: SupabaseClient;
@@ -63,12 +64,21 @@ async function setup(label: string): Promise<T> {
     .single()
     .throwOnError();
   // estado "conectado" simulado pelo worker
-  await admin
+  const { data: sess } = await admin
     .from("whatsapp_sessions")
-    .upsert({ tenant_id: tenantId, status: "conectado", desired_state: "conectado", phone: "5511900000000" })
+    .insert({ tenant_id: tenantId, status: "conectado", desired_state: "conectado", phone: "5511900000000", is_primary: true })
+    .select("id")
+    .single()
     .throwOnError();
-  await admin.from("whatsapp_qr").upsert({ tenant_id: tenantId, qr: `QR-${label}-${run}` }).throwOnError();
-  return { tenantId: tenantId as string, userId: u.user.id, token: s.session!.access_token, client, contactId: c!.id };
+  await admin.from("whatsapp_qr").upsert({ tenant_id: tenantId, session_id: sess!.id, qr: `QR-${label}-${run}` }).throwOnError();
+  return {
+    tenantId: tenantId as string,
+    sessionId: sess!.id as string,
+    userId: u.user.id,
+    token: s.session!.access_token,
+    client,
+    contactId: c!.id,
+  };
 }
 
 describe.skipIf(!enabled)("isolamento do WhatsApp (Supabase real)", () => {
@@ -85,7 +95,7 @@ describe.skipIf(!enabled)("isolamento do WhatsApp (Supabase real)", () => {
   });
 
   it("worker: mensagem recebida pela sessão de A (mesmo telefone existe em B) só cria interação em A", async () => {
-    const repoA = new WorkerTenantRepo(admin, A.tenantId);
+    const repoA = new WorkerTenantRepo(admin, A.tenantId, { id: A.sessionId, isPrimary: true });
     const r = await handleIncoming(repoA, {
       key: { id: `IN-${run}`, remoteJid: `${PHONE}@s.whatsapp.net`, fromMe: false },
       pushName: "Cliente",
@@ -101,7 +111,7 @@ describe.skipIf(!enabled)("isolamento do WhatsApp (Supabase real)", () => {
   });
 
   it("worker: reprocessar a mesma mensagem não duplica", async () => {
-    const repoA = new WorkerTenantRepo(admin, A.tenantId);
+    const repoA = new WorkerTenantRepo(admin, A.tenantId, { id: A.sessionId, isPrimary: true });
     const r = await handleIncoming(repoA, {
       key: { id: `IN-${run}`, remoteJid: `${PHONE}@s.whatsapp.net` },
       message: { conversation: "repetida" },
@@ -111,7 +121,7 @@ describe.skipIf(!enabled)("isolamento do WhatsApp (Supabase real)", () => {
 
   it("credenciais: gravadas cifradas, isoladas por tenant e inacessíveis pela API", async () => {
     const cipher = new CredentialCipher(randomBytes(32).toString("base64"));
-    const repoA = new WorkerTenantRepo(admin, A.tenantId);
+    const repoA = new WorkerTenantRepo(admin, A.tenantId, { id: A.sessionId, isPrimary: true });
     const { state, saveCreds } = await loadTenantAuthState(repoA, cipher);
     await saveCreds();
     await state.keys.set({ "pre-key": { "1": { public: Buffer.from("pub"), private: Buffer.from("priv-secreta") } } });
@@ -128,7 +138,7 @@ describe.skipIf(!enabled)("isolamento do WhatsApp (Supabase real)", () => {
     const got = await again.state.keys.get("pre-key", ["1"]);
     expect(Buffer.from(got["1"].private).toString()).toBe("priv-secreta");
     // repositório do tenant B não enxerga nada de A
-    const repoB = new WorkerTenantRepo(admin, B.tenantId);
+    const repoB = new WorkerTenantRepo(admin, B.tenantId, { id: B.sessionId, isPrimary: true });
     expect((await repoB.getAuth(["creds", "pre-key-1"])).size).toBe(0);
     // valor de A copiado para B não decifra (AAD/chave por tenant)
     expect(() => cipher.decrypt(B.tenantId, "creds", rows!.find((r) => r.key === "creds")!.value_enc)).toThrow();
@@ -158,7 +168,7 @@ describe.skipIf(!enabled)("isolamento do WhatsApp (Supabase real)", () => {
     await B.client.from("whatsapp_outbox").insert({ contact_id: B.contactId, body: `msg de B ${run}` }).throwOnError();
     await A.client.from("whatsapp_outbox").insert({ contact_id: A.contactId, body: `msg de A ${run}` }).throwOnError();
 
-    const claimedA = await new WorkerTenantRepo(admin, A.tenantId).claimOutbox();
+    const claimedA = await new WorkerTenantRepo(admin, A.tenantId, { id: A.sessionId, isPrimary: true }).claimOutbox();
     expect(claimedA.map((i) => i.body)).toEqual([`msg de A ${run}`]);
     const { data: bRows } = await admin.from("whatsapp_outbox").select("status").eq("tenant_id", B.tenantId);
     expect(bRows!.every((r) => r.status === "pendente")).toBe(true);

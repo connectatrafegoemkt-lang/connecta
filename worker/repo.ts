@@ -40,25 +40,45 @@ export interface InboundRepo {
 import type { AdReferral } from "./ad-referral";
 import type { LabelQueueItem, LabelRepo } from "./labels";
 
+/** Um número de WhatsApp do tenant (o principal guarda as chaves sem prefixo). */
+export interface SessionRef {
+  id: string;
+  isPrimary: boolean;
+}
+
 export class WorkerTenantRepo implements InboundRepo, LabelRepo {
+  readonly sessionId: string;
+  readonly isPrimary: boolean;
+
   constructor(
     private readonly sb: SupabaseClient,
     readonly tenantId: string,
+    session: SessionRef,
   ) {
     if (!tenantId) throw new Error("WorkerTenantRepo sem tenantId");
+    if (!session?.id) throw new Error("WorkerTenantRepo sem sessão");
+    this.sessionId = session.id;
+    this.isPrimary = session.isPrimary;
+  }
+
+  /** Chave guardada: números extras ganham o prefixo "s:<sessão>:". */
+  private authKey(key: string) {
+    return this.isPrimary ? key : `s:${this.sessionId}:${key}`;
   }
 
   // ---------- credenciais (valores já cifrados) ----------
   async getAuth(keys: string[]): Promise<Map<string, string>> {
     const out = new Map<string, string>();
-    for (let i = 0; i < keys.length; i += 200) {
+    const back = new Map(keys.map((k) => [this.authKey(k), k]));
+    const stored = [...back.keys()];
+    for (let i = 0; i < stored.length; i += 200) {
       const { data, error } = await this.sb
         .from("whatsapp_auth_keys")
         .select("key, value_enc")
         .eq("tenant_id", this.tenantId)
-        .in("key", keys.slice(i, i + 200));
+        .in("key", stored.slice(i, i + 200));
       if (error) throw error;
-      for (const r of data ?? []) out.set(r.key, r.value_enc);
+      for (const r of data ?? []) out.set(back.get(r.key) ?? r.key, r.value_enc);
     }
     return out;
   }
@@ -67,18 +87,26 @@ export class WorkerTenantRepo implements InboundRepo, LabelRepo {
     if (!entries.length) return;
     const { error } = await this.sb
       .from("whatsapp_auth_keys")
-      .upsert(entries.map((e) => ({ ...e, tenant_id: this.tenantId })), { onConflict: "tenant_id,key" });
+      .upsert(entries.map((e) => ({ key: this.authKey(e.key), value_enc: e.value_enc, tenant_id: this.tenantId })), {
+        onConflict: "tenant_id,key",
+      });
     if (error) throw error;
   }
 
   async deleteAuth(keys: string[]) {
     if (!keys.length) return;
-    const { error } = await this.sb.from("whatsapp_auth_keys").delete().eq("tenant_id", this.tenantId).in("key", keys);
+    const { error } = await this.sb
+      .from("whatsapp_auth_keys")
+      .delete()
+      .eq("tenant_id", this.tenantId)
+      .in("key", keys.map((k) => this.authKey(k)));
     if (error) throw error;
   }
 
+  /** Apaga o login DESTE número (o principal não mexe nos extras e vice-versa). */
   async clearAuth() {
-    const { error } = await this.sb.from("whatsapp_auth_keys").delete().eq("tenant_id", this.tenantId);
+    const q = this.sb.from("whatsapp_auth_keys").delete().eq("tenant_id", this.tenantId);
+    const { error } = this.isPrimary ? await q.not("key", "like", "s:%") : await q.like("key", `s:${this.sessionId}:%`);
     if (error) throw error;
   }
 
@@ -91,16 +119,19 @@ export class WorkerTenantRepo implements InboundRepo, LabelRepo {
     connected_at?: string | null;
     reset_requested_at?: string | null;
   }) {
+    // update (não upsert): um número removido não "volta" por engano
     const { error } = await this.sb
       .from("whatsapp_sessions")
-      .upsert({ ...patch, tenant_id: this.tenantId }, { onConflict: "tenant_id" });
+      .update(patch)
+      .eq("tenant_id", this.tenantId)
+      .eq("id", this.sessionId);
     if (error) throw error;
   }
 
   async setQr(qr: string | null) {
     const { error } = await this.sb
       .from("whatsapp_qr")
-      .upsert({ tenant_id: this.tenantId, qr }, { onConflict: "tenant_id" });
+      .upsert({ tenant_id: this.tenantId, session_id: this.sessionId, qr }, { onConflict: "session_id" });
     if (error) throw error;
   }
 
@@ -138,7 +169,7 @@ export class WorkerTenantRepo implements InboundRepo, LabelRepo {
     const { data, error } = await this.sb
       .from("interactions")
       .upsert(
-        { ...input, tenant_id: this.tenantId, type: "whatsapp", metadata: input.metadata ?? {} },
+        { ...input, tenant_id: this.tenantId, session_id: this.sessionId, type: "whatsapp", metadata: input.metadata ?? {} },
         { onConflict: "tenant_id,external_id", ignoreDuplicates: true },
       )
       .select("id");
@@ -162,7 +193,7 @@ export class WorkerTenantRepo implements InboundRepo, LabelRepo {
       .select("id, contact_id, body, attempts, origin, media_kind, media_path, media_mime, media_filename, contacts(phone)")
       .eq("tenant_id", this.tenantId)
       .eq("status", "pendente")
-      .or(`scheduled_at.is.null,scheduled_at.lte.${new Date().toISOString()}`)
+      .or(this.outboxFilter(`or(scheduled_at.is.null,scheduled_at.lte.${new Date().toISOString()})`))
       .order("created_at")
       .limit(limit);
     if (error) throw error;
@@ -209,12 +240,23 @@ export class WorkerTenantRepo implements InboundRepo, LabelRepo {
     return claimed;
   }
 
+  /**
+   * Fila DESTE número: as mensagens com session_id dele e, no principal,
+   * também as sem número (compatível com a fila antiga). `extra` é uma
+   * condição a mais (sintaxe PostgREST) aplicada aos dois casos.
+   */
+  private outboxFilter(extra: string) {
+    const mine = `and(session_id.eq.${this.sessionId},${extra})`;
+    return this.isPrimary ? `${mine},and(session_id.is.null,${extra})` : mine;
+  }
+
   /** Linhas da fila presas em "enviando" (o worker caiu no meio do envio). */
   async listStuckOutbox(olderThanIso: string) {
     const { data, error } = await this.sb
       .from("whatsapp_outbox")
       .select("id, contact_id, body, created_at")
       .eq("tenant_id", this.tenantId)
+      .or(this.outboxFilter("status.eq.enviando"))
       .eq("status", "enviando")
       .lt("updated_at", olderThanIso)
       .limit(50);
@@ -364,7 +406,7 @@ export class WorkerTenantRepo implements InboundRepo, LabelRepo {
   async enqueueAiMessage(contactId: string, body: string) {
     const { error } = await this.sb
       .from("whatsapp_outbox")
-      .insert({ tenant_id: this.tenantId, contact_id: contactId, body, origin: "ia" });
+      .insert({ tenant_id: this.tenantId, session_id: this.sessionId, contact_id: contactId, body, origin: "ia" });
     if (error) throw error;
   }
 
@@ -553,9 +595,11 @@ export class WorkerTenantRepo implements InboundRepo, LabelRepo {
 export async function listSessionStates(sb: SupabaseClient) {
   const { data, error } = await sb
     .from("whatsapp_sessions")
-    .select("tenant_id, desired_state, status, reset_requested_at, tenants(suspended_at)");
+    .select("id, is_primary, tenant_id, desired_state, status, reset_requested_at, tenants(suspended_at)");
   if (error) throw error;
   type Row = {
+    id: string;
+    is_primary: boolean;
     tenant_id: string;
     desired_state: "conectado" | "desconectado";
     status: string;
@@ -565,6 +609,8 @@ export async function listSessionStates(sb: SupabaseClient) {
   return ((data ?? []) as unknown as Row[]).map((r) => {
     const t = Array.isArray(r.tenants) ? r.tenants[0] : r.tenants;
     return {
+      session_id: r.id,
+      is_primary: r.is_primary,
       tenant_id: r.tenant_id,
       desired_state: r.desired_state,
       status: r.status,

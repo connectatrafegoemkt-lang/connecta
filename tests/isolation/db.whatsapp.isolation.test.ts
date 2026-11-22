@@ -13,8 +13,11 @@ beforeAll(async () => {
   // Estado do worker (service_role) para os dois tenants
   for (const t of [A, B]) {
     await as("service", async (q) => {
-      await q("insert into public.whatsapp_sessions (tenant_id, status, desired_state, phone) values ($1, 'conectado', 'conectado', '5511900000000')", [t.tenantId]);
-      await q("insert into public.whatsapp_qr (tenant_id, qr) values ($1, $2)", [t.tenantId, `QR-SECRETO-${t.tenantId}`]);
+      await q("insert into public.whatsapp_sessions (tenant_id, status, desired_state, phone, is_primary) values ($1, 'conectado', 'conectado', '5511900000000', true)", [t.tenantId]);
+      await q(
+        "insert into public.whatsapp_qr (tenant_id, session_id, qr) select $1, id, $2 from public.whatsapp_sessions where tenant_id = $1 and is_primary",
+        [t.tenantId, `QR-SECRETO-${t.tenantId}`],
+      );
       await q("insert into public.whatsapp_auth_keys (tenant_id, key, value_enc) values ($1, 'creds', 'cifrado')", [t.tenantId]);
     });
   }

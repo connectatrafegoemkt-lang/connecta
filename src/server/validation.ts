@@ -130,6 +130,12 @@ export const idSchema = uuid;
 export const whatsappSendSchema = z.strictObject({
   contact_id: uuid,
   body: z.string().trim().min(1).max(4096),
+  /** Por qual número enviar (opcional: senão o último da conversa / o principal). */
+  session_id: uuid.optional().or(z.literal("").transform(() => undefined)),
+});
+
+export const whatsappNumberLabelSchema = z.strictObject({
+  label: z.string().trim().min(1, "Dê um nome ao número").max(40),
 });
 
 export const quickReplySchema = z.strictObject({
