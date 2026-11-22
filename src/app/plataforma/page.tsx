@@ -1,9 +1,11 @@
-import { Ban, KeyRound, Trash2, Bot, Building2, CirclePlay, Contact, MessageCircle, Plus, ShieldCheck, Users } from "lucide-react";
+import Link from "next/link";
+import { BarChart3, Ban, KeyRound, Trash2, Bot, Building2, CirclePlay, Contact, MessageCircle, Plus, ShieldCheck, Users } from "lucide-react";
 import { getPlatformContext, listClientTenants } from "@/server/platform";
 import { ActionForm } from "@/components/action-form";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { dateTime } from "@/components/format";
+import { currentMonth, monthLabel, shiftMonth } from "@/shared/months";
 import { NICHE_KEYS, NICHES } from "@/shared/niches";
 import { createClientTenantAction, deleteClientTenantAction, resetClientPasswordAction, setClientSuspendedAction } from "./actions";
 
@@ -46,6 +48,20 @@ export default async function PlataformaPage() {
         title="Painel da CONNECTA"
         subtitle="Seus clientes no CRM. Aqui aparecem só números gerais; contatos e conversas de cada cliente continuam privados."
       />
+
+      <Link
+        href={`/plataforma/relatorios?mes=${shiftMonth(currentMonth(), -1)}`}
+        className="card flex flex-wrap items-center justify-between gap-3 border-brand-500/30 bg-brand-500/5 p-4 transition hover:bg-brand-500/10"
+      >
+        <span className="flex items-center gap-3">
+          <BarChart3 className="h-5 w-5 text-accent" />
+          <span>
+            <span className="block font-medium">Relatório de {monthLabel(shiftMonth(currentMonth(), -1)).toLowerCase()} pronto</span>
+            <span className="block text-sm text-muted">Fechamento do mês de cada cliente, com comparação ao mês anterior e PDF para enviar.</span>
+          </span>
+        </span>
+        <span className="btn-primary btn-sm">Abrir relatórios</span>
+      </Link>
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
         {stats.map((s) => (

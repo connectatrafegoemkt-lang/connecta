@@ -299,6 +299,10 @@ describe.skipIf(!enabled)("isolamento via API do app (Next.js)", () => {
     const list = await api(A, "/api/plataforma/clientes");
     expect(list.status).toBe(403);
     expect(JSON.stringify(list.body)).not.toContain(B.tenantId);
+    // relatório mensal (planilha) também é só da equipe CONNECTA
+    const rel = await api(A, "/api/plataforma/relatorios?mes=2026-01");
+    expect(rel.status).toBe(403);
+    expect(JSON.stringify(rel.body)).not.toContain(B.tenantId);
     const slug = `invasor-${run}`;
     const email = `invasor-${run}@teste.connecta.local`;
     const r = await api(A, "/api/plataforma/clientes", {

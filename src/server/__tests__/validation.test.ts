@@ -33,6 +33,24 @@ describe("schemas de entrada rejeitam tenant_id do cliente", () => {
   });
 });
 
+describe("planilha do relatório mensal", () => {
+  it("escapa ; e aspas e neutraliza fórmulas", async () => {
+    const { monthlyReportCsv } = await import("../platform");
+    const csv = monthlyReportCsv([
+      {
+        id: "x", name: '=HYPERLINK("x")', slug: "a;b", suspended: false, members: 1, contacts_total: 2, leads_new: 3, leads_won: 1,
+        won_value_cents: 123456, leads_lost: 0, open_value_cents: 0, wa_in: 0, wa_out: 0, wa_conversations: 0, ai_responses: 0,
+        ai_suggestions: 0, ai_tokens: 0, tasks_created: 0, tasks_done: 0, interactions_other: 0, top_sources: [{ source: "Instagram", count: 3 }],
+      },
+    ]);
+    const line = csv.split("\r\n")[1]!;
+    expect(line.startsWith(`"'=HYPERLINK(""x"")"`)).toBe(true);
+    expect(line).toContain('"a;b"');
+    expect(line).toContain("1234,56");
+    expect(line).toContain("Instagram (3)");
+  });
+});
+
 describe("senha provisória / troca de senha", () => {
   it("exige 10+ caracteres e confirmação igual", async () => {
     const { passwordChangeSchema, passwordResetSchema, platformPasswordResetSchema } = await import("../validation");

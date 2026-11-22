@@ -77,3 +77,68 @@ export async function setClientSuspended(p: PlatformContext, tenantId: string, s
 }
 
 export { createClientTenant, deleteClientTenant } from "./admin/platform-admin";
+
+export interface MonthlyReportRow {
+  id: string;
+  name: string;
+  slug: string;
+  suspended: boolean;
+  members: number;
+  contacts_total: number;
+  leads_new: number;
+  leads_won: number;
+  won_value_cents: number;
+  leads_lost: number;
+  open_value_cents: number;
+  wa_in: number;
+  wa_out: number;
+  wa_conversations: number;
+  ai_responses: number;
+  ai_suggestions: number;
+  ai_tokens: number;
+  tasks_created: number;
+  tasks_done: number;
+  interactions_other: number;
+  top_sources: { source: string; count: number }[];
+}
+
+/**
+ * Relatório mensal (só números por cliente). `month` = "AAAA-MM" já
+ * validado; a autorização é refeita no banco (platform_monthly_report).
+ */
+export async function getMonthlyReport(p: PlatformContext, month: string): Promise<MonthlyReportRow[]> {
+  const { data, error } = await p.supabase.rpc("platform_monthly_report", { p_month: `${month}-01` });
+  if (error) throw fromDbError(error);
+  return (data as MonthlyReportRow[]).map((r) => ({
+    ...r,
+    won_value_cents: Number(r.won_value_cents),
+    open_value_cents: Number(r.open_value_cents),
+    ai_tokens: Number(r.ai_tokens),
+    top_sources: Array.isArray(r.top_sources) ? r.top_sources : [],
+  }));
+}
+
+const csvCell = (v: unknown) => {
+  const s = String(v ?? "");
+  // evita fórmulas no Excel (=, +, -, @) e escapa aspas
+  const safe = /^[=+\-@]/.test(s) ? `'${s}` : s;
+  return /[";\n]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
+};
+
+/** CSV (separador ";", padrão do Excel em português). */
+export function monthlyReportCsv(rows: MonthlyReportRow[]): string {
+  const head = [
+    "Cliente", "Identificador", "Suspenso", "Usuários", "Contatos (total)", "Leads novos", "Fechados", "Valor fechado (R$)",
+    "Perdidos", "Em aberto no funil (R$)", "WhatsApp recebidas", "WhatsApp enviadas", "Conversas", "Respostas da IA",
+    "Sugestões da IA", "Tokens da IA", "Tarefas criadas", "Tarefas concluídas", "Outras interações", "Principais origens",
+  ];
+  const money = (c: number) => (c / 100).toFixed(2).replace(".", ",");
+  const lines = rows.map((r) =>
+    [
+      r.name, r.slug, r.suspended ? "sim" : "não", r.members, r.contacts_total, r.leads_new, r.leads_won, money(r.won_value_cents),
+      r.leads_lost, money(r.open_value_cents), r.wa_in, r.wa_out, r.wa_conversations, r.ai_responses, r.ai_suggestions, r.ai_tokens,
+      r.tasks_created, r.tasks_done, r.interactions_other, r.top_sources.map((s) => `${s.source} (${s.count})`).join(", "),
+    ].map(csvCell).join(";"),
+  );
+  return "﻿" + [head.join(";"), ...lines].join("\r\n");
+}
