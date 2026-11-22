@@ -55,6 +55,11 @@ Realtime), Tailwind CSS.
    Mudanças de etiqueta feitas por pessoas viram `whatsapp_label_queue`
    (sem acesso para usuários); mudanças do worker não entram na fila.
    Investimento em anúncios (`app.tenant_ad_spend`) só pela plataforma.
+   Vários números de WhatsApp: `whatsapp_sessions` tem um id por número
+   (`is_primary` = o principal; limite em `tenants.whatsapp_limit`, só a
+   plataforma altera). QR, fila e interações têm `session_id` com FK composta
+   (tenant_id, id). O worker tem uma conexão por número e prefixa as chaves
+   dos números extras com `s:<session_id>:`.
    Suspensão de cliente (`tenants.suspended_at`, via
    `public.platform_set_tenant_suspended()`): `app.current_tenant_id()` devolve
    NULL para usuários do cliente suspenso, então todo RLS nega; o worker pausa
