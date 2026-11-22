@@ -62,6 +62,38 @@ export function ConnectionPanel({ initial, isAdmin, tenantId, compact = false }:
     };
   }, [tenantId]);
 
+  // Reserva do tempo real: enquanto não estiver conectado, consulta o status e
+  // o QR a cada 3 s (o QR muda a cada ~20 s). Sem isso, se o Realtime falhar,
+  // a tela fica em "Conectando…" e o QR nunca aparece.
+  const polling = state.status !== "conectado" && state.status !== "desconectado";
+  useEffect(() => {
+    if (!polling) return;
+    let stop = false;
+    const tick = async () => {
+      if (document.visibilityState !== "visible") return;
+      try {
+        const res = await fetch("/api/whatsapp/status", { cache: "no-store" });
+        if (!res.ok || stop) return;
+        const j = (await res.json()) as Partial<State>;
+        setState((s) => ({
+          ...s,
+          status: (j.status as Status) ?? s.status,
+          phone: j.phone ?? null,
+          last_error: j.last_error ?? null,
+          qr: isAdmin ? (j.qr ?? null) : s.qr,
+        }));
+      } catch {
+        /* rede instável: tenta de novo no próximo ciclo */
+      }
+    };
+    void tick();
+    const t = setInterval(() => void tick(), 3000);
+    return () => {
+      stop = true;
+      clearInterval(t);
+    };
+  }, [polling, isAdmin]);
+
   useEffect(() => {
     let cancelled = false;
     if (state.qr && state.status !== "conectado") {
