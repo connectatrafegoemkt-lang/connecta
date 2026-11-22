@@ -37,7 +37,7 @@ export async function getWhatsappQr(ctx: TenantContext): Promise<string | null> 
   return (data as { qr: string | null } | null)?.qr ?? null;
 }
 
-export async function requestWhatsapp(ctx: TenantContext, action: "conectar" | "desconectar") {
+export async function requestWhatsapp(ctx: TenantContext, action: "conectar" | "desconectar" | "reiniciar") {
   requirePerm(ctx, "whatsapp.conectar");
   const { error } = await ctx.db.rpc("whatsapp_request", { p_action: action });
   if (error) throw fromDbError(error);
