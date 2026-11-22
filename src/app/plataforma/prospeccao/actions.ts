@@ -3,12 +3,18 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getPlatformContext } from "@/server/platform";
+import { getTenantContext } from "@/server/context";
+import { HttpError } from "@/server/errors";
+import { findOrCreateContactByPhone } from "@/server/data/contacts";
+import { queueWhatsappMessage } from "@/server/data/whatsapp";
+import { queueTextMessage } from "@/server/data/whatsapp-media";
 import {
   addSheetSource,
   deleteProspect,
   deleteSheetSource,
   importProspects,
   listSheetSources,
+  getProspect,
   logProspectContact,
   saveProspect,
   syncSheetSource,
@@ -151,4 +157,69 @@ export async function deleteSheetAction(_: ActionState, fd: FormData): Promise<A
   } catch (e) {
     return toActionError(e);
   }
+}
+
+// ---------------------------------------------------------------- WhatsApp
+
+/**
+ * A conversa com a lead acontece pelo WhatsApp da PRÓPRIA empresa de quem
+ * está logado (a CONNECTA no CRM): o contato é criado/achado nesse tenant,
+ * com RLS e a permissão whatsapp.enviar de sempre.
+ */
+async function ownContactFor(prospectId: string) {
+  const p = await getPlatformContext();
+  let ctx;
+  try {
+    ctx = await getTenantContext();
+  } catch {
+    throw new HttpError(400, "Seu usuário precisa estar ligado à empresa CONNECTA no CRM para usar o WhatsApp.");
+  }
+  const x = await getProspect(p, prospectId);
+  if (!x.phone) throw new HttpError(400, "Essa lead não tem WhatsApp cadastrado.");
+  const contactId = await findOrCreateContactByPhone(ctx, {
+    name: x.company && !x.name.includes(x.company) ? `${x.name} (${x.company})` : x.name,
+    phone: x.phone,
+    company: x.company,
+    source: "Prospecção CONNECTA",
+  });
+  return { p, ctx, x, contactId };
+}
+
+const brTime = (iso: string) =>
+  new Date(iso).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+
+export async function sendProspectWhatsappAction(_: ActionState, fd: FormData): Promise<ActionState> {
+  try {
+    const id = parseOrThrow(idSchema, fd.get("id"));
+    const body = String(fd.get("body") ?? "").trim();
+    if (!body) return { ok: false, error: "Escreva a mensagem." };
+    if (body.length > 4096) return { ok: false, error: "Mensagem longa demais (máximo 4096 caracteres)." };
+    const scheduled = fd.get("modo") === "agendar" ? localToIso(fd.get("scheduled_at")) : null;
+    if (fd.get("modo") === "agendar" && !scheduled) return { ok: false, error: "Escolha a data e a hora do agendamento." };
+    const { p, ctx, x, contactId } = await ownContactFor(id);
+    if (scheduled) await queueTextMessage(ctx, contactId, body, scheduled);
+    else await queueWhatsappMessage(ctx, contactId, body);
+    await logProspectContact(p, id, {
+      type: scheduled ? "nota" : "whatsapp",
+      body: scheduled ? `Mensagem de WhatsApp agendada para ${brTime(scheduled)}:\n${body}` : body,
+      next_followup_at: x.next_followup_at,
+    });
+    revalidatePath("/plataforma/prospeccao");
+    revalidatePath(`/plataforma/prospeccao/${id}`);
+    revalidatePath("/whatsapp");
+    return { ok: true, message: scheduled ? `Mensagem agendada para ${brTime(scheduled)}.` : "Mensagem enviada para a fila do WhatsApp." };
+  } catch (e) {
+    return toActionError(e);
+  }
+}
+
+/** Abre a conversa completa (áudio, arquivos, histórico) na tela de WhatsApp do CRM. */
+export async function openProspectChatAction(_: ActionState, fd: FormData): Promise<ActionState> {
+  let contactId: string;
+  try {
+    contactId = (await ownContactFor(parseOrThrow(idSchema, fd.get("id")))).contactId;
+  } catch (e) {
+    return toActionError(e);
+  }
+  redirect(`/whatsapp?contato=${contactId}`);
 }

@@ -168,3 +168,42 @@ export async function deleteContact(ctx: TenantContext, id: string) {
   if (error) throw fromDbError(error);
   if (!data?.length) throw notFound("Contato não encontrado");
 }
+
+/** Variantes do telefone brasileiro com e sem o 9º dígito. */
+function phoneVariants(phone: string): string[] {
+  const d = phone.replace(/\D/g, "");
+  const out = new Set([d]);
+  const br = /^55(\d{2})(\d{8,9})$/.exec(d);
+  if (br) {
+    const [, ddd, num] = br;
+    if (num!.length === 9 && num!.startsWith("9")) out.add(`55${ddd}${num!.slice(1)}`);
+    if (num!.length === 8 && /^[6-9]/.test(num!)) out.add(`55${ddd}9${num}`);
+  }
+  return [...out];
+}
+
+/**
+ * Acha o contato pelo telefone NO TENANT DA SESSÃO ou cria um novo.
+ * Usado pela prospecção da CONNECTA para conversar pelo WhatsApp da própria
+ * empresa (o contato fica no tenant de quem está logado, com RLS).
+ */
+export async function findOrCreateContactByPhone(
+  ctx: TenantContext,
+  input: { name: string; phone: string; company?: string | null; source?: string | null },
+): Promise<string> {
+  const { data, error } = await ctx.db
+    .select("contacts", "id")
+    .in("phone", phoneVariants(input.phone))
+    .order("created_at")
+    .limit(1);
+  if (error) throw fromDbError(error);
+  const found = (data as unknown as { id: string }[] | null)?.[0];
+  if (found) return found.id;
+  const c = await createContact(ctx, {
+    name: input.name.slice(0, 200),
+    phone: input.phone,
+    company: input.company ?? null,
+    source: input.source ?? null,
+  });
+  return c.id;
+}
