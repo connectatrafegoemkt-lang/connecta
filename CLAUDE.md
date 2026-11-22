@@ -46,7 +46,10 @@ Realtime), Tailwind CSS.
    Prospecção da CONNECTA (leads ativas, `src/app/plataforma/prospeccao`):
    tabelas `app.prospects`/`app.prospect_activities`, fora da API e sem
    tenant (não são dados de cliente), acessadas só por funções
-   `public.platform_prospect*` que exigem `is_platform_admin()`.
+   `public.platform_prospect*` que exigem `is_platform_admin()`. Planilhas
+   do Google Sheets (`app.prospect_sheet_sources`/`_seen`): o app só busca
+   `docs.google.com/spreadsheets/d/<id>/export` (URL montada a partir do id
+   validado, nunca a URL do usuário) e grava via `platform_sheet_sync`.
    Tráfego pago / etiquetas do WhatsApp: `contacts.ad_source/ad_at` e
    `tags.wa_label_id` só o worker grava (trigger `app.guard_worker_columns`).
    Mudanças de etiqueta feitas por pessoas viram `whatsapp_label_queue`
