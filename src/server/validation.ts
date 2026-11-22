@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { PERMISSION_KEYS, type Permission } from "@/shared/permissions";
+import { ACTIVITY_TYPES, PROSPECT_STATUS } from "@/shared/prospects";
 import { FIELD_TYPES, NICHE_KEYS, SETUP_GROUPS } from "@/shared/niches";
 
 /**
@@ -166,6 +167,30 @@ export const platformSuspendSchema = z.strictObject({
 export const platformDeleteSchema = z.strictObject({
   confirmacao: z.string().trim().min(1).max(60),
 });
+
+// Prospecção da CONNECTA (Painel)
+export const prospectSchema = z.strictObject({
+  name: z.string().trim().min(1).max(200),
+  company: optionalText(200),
+  phone: phoneSchema.nullable().optional().or(z.literal("").transform(() => null)),
+  email: z.email().max(320).nullable().optional().or(z.literal("").transform(() => null)),
+  city: optionalText(120),
+  niche: optionalText(120),
+  source: optionalText(120),
+  status: z.enum(PROSPECT_STATUS).optional(),
+  value_cents: z.coerce.number().int().min(0).max(1e13).optional(),
+  notes: optionalText(10000),
+  next_followup_at: z.iso.datetime({ offset: true }).nullable().optional(),
+});
+export type ProspectInput = z.infer<typeof prospectSchema>;
+
+export const prospectLogSchema = z.strictObject({
+  type: z.enum(ACTIVITY_TYPES),
+  body: z.string().trim().max(5000).optional(),
+  next_followup_at: z.iso.datetime({ offset: true }).nullable().optional(),
+  status: z.enum(PROSPECT_STATUS).optional().or(z.literal("").transform(() => undefined)),
+});
+export type ProspectLogInput = z.infer<typeof prospectLogSchema>;
 
 // Troca de senha (própria) e redefinição de senha provisória
 const newPassword = z.string().min(10, "A senha precisa ter pelo menos 10 caracteres").max(200);

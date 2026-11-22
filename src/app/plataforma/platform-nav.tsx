@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, Building2 } from "lucide-react";
+import { BarChart3, Building2, Target } from "lucide-react";
 
 const ITEMS = [
   { href: "/plataforma", label: "Clientes", icon: Building2, exact: true },
   { href: "/plataforma/relatorios", label: "Relatórios mensais", icon: BarChart3 },
+  { href: "/plataforma/prospeccao", label: "Prospecção", icon: Target },
 ];
 
 export function PlatformNav() {

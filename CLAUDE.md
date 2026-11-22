@@ -43,6 +43,10 @@ Realtime), Tailwind CSS.
    METADADOS de todos os clientes via `public.platform_tenants_overview()`
    (SECURITY DEFINER, exige `public.is_platform_admin()`, lista em
    `app.platform_admins`). Nunca expor contatos/conversas/dados de negócio ali.
+   Prospecção da CONNECTA (leads ativas, `src/app/plataforma/prospeccao`):
+   tabelas `app.prospects`/`app.prospect_activities`, fora da API e sem
+   tenant (não são dados de cliente), acessadas só por funções
+   `public.platform_prospect*` que exigem `is_platform_admin()`.
    Suspensão de cliente (`tenants.suspended_at`, via
    `public.platform_set_tenant_suspended()`): `app.current_tenant_id()` devolve
    NULL para usuários do cliente suspenso, então todo RLS nega; o worker pausa
