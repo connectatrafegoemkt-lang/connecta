@@ -9,7 +9,7 @@ beforeAll(async () => {
   A = await createTenantFixture("wa-reset-a");
   B = await createTenantFixture("wa-reset-b");
   await as("service", (q) =>
-    q("insert into public.whatsapp_sessions (tenant_id, desired_state, status) values ($1, 'conectado', 'conectado'), ($2, 'conectado', 'conectado')", [A.tenantId, B.tenantId]),
+    q("insert into public.whatsapp_sessions (tenant_id, desired_state, status, is_primary) values ($1, 'conectado', 'conectado', true), ($2, 'conectado', 'conectado', true)", [A.tenantId, B.tenantId]),
   );
 });
 

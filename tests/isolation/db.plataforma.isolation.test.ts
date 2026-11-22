@@ -59,7 +59,7 @@ describe("painel da plataforma", () => {
     );
     expect(r.rows.map((x) => x.id).sort()).toEqual([A.tenantId, B.tenantId].sort());
     expect(Object.keys(r.rows[0]).sort()).toEqual(
-      ["ai_messages_month", "ai_mode", "ai_tokens_month", "contacts", "created_at", "id", "members", "name", "slug", "suspended_at", "suspended_reason", "whatsapp_status"].sort(),
+      ["ai_messages_month", "ai_mode", "ai_tokens_month", "contacts", "created_at", "id", "members", "name", "slug", "suspended_at", "suspended_reason", "whatsapp_connected", "whatsapp_limit", "whatsapp_numbers", "whatsapp_status"].sort(),
     );
     const a = r.rows.find((x) => x.id === A.tenantId)!;
     expect(a.members).toBe(2);
