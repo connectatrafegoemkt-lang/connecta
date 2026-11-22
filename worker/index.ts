@@ -41,14 +41,18 @@ async function tick() {
   ticking = true;
   try {
     const states = await listSessionStates(sb);
+    // Uma conexão por NÚMERO (sessão); cada uma presa ao seu tenant.
     for (const s of states) {
-      let running = sessions.get(s.tenant_id);
+      const key = s.session_id;
+      const ref = { id: s.session_id, isPrimary: s.is_primary };
+      const tag = { tenant: s.tenant_id, numero: s.session_id };
+      let running = sessions.get(key);
       // "Gerar novo QR code": apaga o login guardado e recomeça o pareamento.
       if (s.reset_requested_at && !s.suspended) {
-        const repo = running?.repo ?? new WorkerTenantRepo(sb, s.tenant_id);
-        log.info({ tenant: s.tenant_id }, "novo QR code pedido: reiniciando pareamento");
+        const repo = running?.repo ?? new WorkerTenantRepo(sb, s.tenant_id, ref);
+        log.info(tag, "novo QR code pedido: reiniciando pareamento");
         if (running) {
-          sessions.delete(s.tenant_id);
+          sessions.delete(key);
           await running.stop(true).catch((e) => log.error({ err: e }, "falha ao parar sessão"));
           running = undefined;
         } else {
@@ -61,39 +65,41 @@ async function tick() {
       const action = planSession({ desired: s.desired_state, suspended: s.suspended, running: Boolean(running) });
       if (action === "start") {
         const session = new TenantSession(
-          new WorkerTenantRepo(sb, s.tenant_id),
+          new WorkerTenantRepo(sb, s.tenant_id, ref),
           cipher,
-          log.child({ tenant: s.tenant_id }) as unknown as pino.Logger,
+          log.child(tag) as unknown as pino.Logger,
           aiClient,
         );
-        sessions.set(s.tenant_id, session);
+        sessions.set(key, session);
         session.start().catch(async (e) => {
-          log.error({ err: e, tenant: s.tenant_id }, "falha ao iniciar sessão");
-          sessions.delete(s.tenant_id);
+          log.error({ err: e, ...tag }, "falha ao iniciar sessão");
+          sessions.delete(key);
           await session.repo.setSession({ status: "erro", last_error: "Falha ao iniciar a sessão" }).catch(() => undefined);
         });
       } else if (action === "logout" && running) {
-        sessions.delete(s.tenant_id);
+        sessions.delete(key);
         await running.stop(true).catch((e) => log.error({ err: e }, "falha ao parar sessão"));
       } else if (action === "pause" && running) {
         // cliente suspenso: fecha a conexão SEM apagar o login do WhatsApp
-        sessions.delete(s.tenant_id);
-        log.info({ tenant: s.tenant_id }, "cliente suspenso: sessão pausada");
+        sessions.delete(key);
+        log.info(tag, "cliente suspenso: sessão pausada");
         await running.stop(false).catch((e) => log.error({ err: e }, "falha ao pausar sessão"));
         await running.repo
           .setSession({ status: "desconectado", last_error: "Cliente suspenso pela CONNECTA" })
           .catch(() => undefined);
       }
     }
-    // Cliente excluído: a sessão dele some da lista; fecha a conexão.
-    const present = new Set(states.map((s) => s.tenant_id));
-    for (const [tenantId, running] of sessions) {
-      if (present.has(tenantId)) continue;
-      sessions.delete(tenantId);
-      log.info({ tenant: tenantId }, "cliente removido: sessão encerrada");
-      await running.stop(false).catch((e) => log.error({ err: e }, "falha ao encerrar sessão"));
+    // Número removido (desvincula o aparelho) ou cliente excluído (só fecha).
+    const presentSessions = new Set(states.map((s) => s.session_id));
+    const presentTenants = new Set(states.map((s) => s.tenant_id));
+    for (const [key, running] of sessions) {
+      if (presentSessions.has(key)) continue;
+      sessions.delete(key);
+      const tenantGone = !presentTenants.has(running.tenantId);
+      log.info({ tenant: running.tenantId, numero: key }, tenantGone ? "cliente removido: sessão encerrada" : "número removido: desconectando");
+      await running.stop(!tenantGone, { forget: true }).catch((e) => log.error({ err: e }, "falha ao encerrar sessão"));
     }
-    await Promise.all([...sessions.values()].map((s) => s.flushOutbox().catch((e) => log.error({ err: e, tenant: s.tenantId }, "falha na fila"))));
+    await Promise.all([...sessions.values()].map((s) => s.flushOutbox().catch((e) => log.error({ err: e, tenant: s.tenantId, numero: s.repo.sessionId }, "falha na fila"))));
     await Promise.all([...sessions.values()].map((s) => s.syncLabels()));
   } catch (e) {
     log.error({ err: e }, "erro no ciclo do worker");

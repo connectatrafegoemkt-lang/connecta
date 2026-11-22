@@ -176,15 +176,16 @@ export class TenantSession {
       }
     });
 
-    // Etiquetas do WhatsApp Business → etiquetas do CRM
-    sock.ev.on("labels.edit", async (label) => {
+    // Etiquetas do WhatsApp Business → etiquetas do CRM (só o número
+    // principal: ids de etiqueta são de cada conta e colidiriam entre números)
+    if (this.repo.isPrimary) sock.ev.on("labels.edit", async (label) => {
       try {
         await onLabelEdit(this.repo, label);
       } catch (e) {
         this.log.warn({ err: e }, "falha ao sincronizar etiqueta do WhatsApp");
       }
     });
-    sock.ev.on("labels.association", async ({ association, type }) => {
+    if (this.repo.isPrimary) sock.ev.on("labels.association", async ({ association, type }) => {
       try {
         if (association.type !== "label_jid") return;
         let phone = jidToPhone(association.chatId);
@@ -326,7 +327,7 @@ export class TenantSession {
   /** CRM → WhatsApp: aplica no celular as etiquetas mudadas por pessoas no CRM. */
   async syncLabels() {
     const sock = this.sock;
-    if (!sock || !this.connected || this.labelsBusy || !sock.user?.id) return;
+    if (!sock || !this.connected || this.labelsBusy || !sock.user?.id || !this.repo.isPrimary) return;
     this.labelsBusy = true;
     try {
       await processLabelQueue(this.repo, sock, sock.user.id);
@@ -341,8 +342,11 @@ export class TenantSession {
     }
   }
 
-  /** Para a sessão. Com logout=true desvincula o aparelho e apaga credenciais. */
-  async stop(logout: boolean) {
+  /**
+   * Para a sessão. Com logout=true desvincula o aparelho e apaga credenciais.
+   * forget=true: o número foi removido (não grava mais nada dele no banco).
+   */
+  async stop(logout: boolean, opts: { forget?: boolean } = {}) {
     this.stopped = true;
     this.ai.cancelAll();
     this.connected = false;
@@ -356,6 +360,7 @@ export class TenantSession {
     }
     if (logout) {
       await this.repo.clearAuth();
+      if (opts.forget) return;
       await this.repo.setQr(null);
       await this.repo.setSession({ status: "desconectado", phone: null, connected_at: null });
     }
