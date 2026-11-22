@@ -158,3 +158,11 @@ export const platformSuspendSchema = z.strictObject({
 export const platformDeleteSchema = z.strictObject({
   confirmacao: z.string().trim().min(1).max(60),
 });
+
+// Troca de senha (própria) e redefinição de senha provisória
+const newPassword = z.string().min(10, "A senha precisa ter pelo menos 10 caracteres").max(200);
+export const passwordChangeSchema = z
+  .strictObject({ senha: newPassword, confirmacao: z.string().max(200) })
+  .refine((v) => v.senha === v.confirmacao, { message: "As senhas não conferem", path: ["confirmacao"] });
+export const passwordResetSchema = z.strictObject({ senha: newPassword });
+export const platformPasswordResetSchema = z.strictObject({ email: z.email(), senha: newPassword });
