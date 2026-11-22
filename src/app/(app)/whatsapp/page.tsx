@@ -3,9 +3,10 @@ import { ArrowLeft, MessageCircle } from "lucide-react";
 import { can, getTenantContext } from "@/server/context";
 import { getContact } from "@/server/data/contacts";
 import {
-  getWhatsappQr,
-  getWhatsappSession,
+  getWhatsappLimit,
+  getWhatsappQrs,
   listConversations,
+  listWhatsappNumbers,
   listPendingOutbox,
   listThread,
 } from "@/server/data/whatsapp";
@@ -27,6 +28,7 @@ import { AiToggle } from "./ai-toggle";
 import { TagPicker } from "./tag-picker";
 import { ConversationList } from "./conversation-list";
 import { LeadDrawer } from "./lead-drawer";
+import { NumbersManager } from "./numbers-manager";
 
 export const metadata = { title: "WhatsApp" };
 
@@ -36,18 +38,20 @@ export default async function WhatsappPage({ searchParams }: PageProps<"/whatsap
   const sp = await searchParams;
   const selected = idSchema.safeParse(sp.contato).success ? (sp.contato as string) : null;
   const tagFilter = idSchema.safeParse(sp.etiqueta).success ? (sp.etiqueta as string) : undefined;
+  const numberFilter = idSchema.safeParse(sp.numero).success ? (sp.numero as string) : undefined;
 
-  const [session, qr, conversations, aiSettings, quickReplies, tags] = await Promise.all([
-    getWhatsappSession(ctx),
-    getWhatsappQr(ctx),
-    listConversations(ctx, { tagId: tagFilter }),
+  const [numbers, qrs, limit, conversations, aiSettings, quickReplies, tags] = await Promise.all([
+    listWhatsappNumbers(ctx),
+    getWhatsappQrs(ctx),
+    getWhatsappLimit(ctx),
+    listConversations(ctx, { tagId: tagFilter, sessionId: numberFilter }),
     getAiSettings(ctx),
     listQuickReplies(ctx),
     listTags(ctx),
   ]);
   const qs = (extra: Record<string, string | undefined>) => {
     const p = new URLSearchParams();
-    const all = { contato: selected ?? undefined, etiqueta: tagFilter, ...extra };
+    const all = { contato: selected ?? undefined, etiqueta: tagFilter, numero: numberFilter, ...extra };
     for (const [k, v] of Object.entries(all)) if (v) p.set(k, v);
     const str = p.toString();
     return str ? `/whatsapp?${str}` : "/whatsapp";
@@ -80,6 +84,17 @@ export default async function WhatsappPage({ searchParams }: PageProps<"/whatsap
     }
   }
 
+  const canConnect = can(ctx, "whatsapp.conectar");
+  const connectedNumbers = numbers.filter((n) => n.status === "conectado");
+  const numberLinks =
+    numbers.length > 1
+      ? [
+          { id: null, name: "Todos os números", href: qs({ numero: undefined }), active: !numberFilter },
+          ...numbers.map((n) => ({ id: n.id, name: n.label, href: qs({ numero: n.id }), active: numberFilter === n.id })),
+        ]
+      : [];
+  const currentConversation = contact ? conversations.find((c) => c.contact_id === contact.id) : undefined;
+
   const tagLinks = [
     { id: null, name: "Todas", href: qs({ etiqueta: undefined }), active: !tagFilter },
     ...tags.map((t) => ({ id: t.id, name: t.name, color: t.color, href: qs({ etiqueta: t.id }), active: tagFilter === t.id })),
@@ -89,12 +104,28 @@ export default async function WhatsappPage({ searchParams }: PageProps<"/whatsap
     <div className="space-y-4">
       <LiveRefresh tenantId={ctx.tenantId} contactId={contact?.id ?? null} pendingCount={pending.filter((p) => p.status !== "erro" && !p.scheduled_at).length} />
 
-      {session.status !== "conectado" && (
+      {/* Números que ainda não estão conectados: status e QR em destaque */}
+      {numbers.length === 0 ? (
         <ConnectionPanel
-          isAdmin={can(ctx, "whatsapp.conectar")}
+          isAdmin={canConnect}
           tenantId={ctx.tenantId}
-          initial={{ status: session.status, phone: session.phone, last_error: session.last_error, qr }}
+          sessionId={null}
+          initial={{ status: "desconectado", phone: null, last_error: null, qr: null }}
         />
+      ) : (
+        numbers
+          .filter((n) => n.status !== "conectado")
+          .map((n) => (
+            <ConnectionPanel
+              key={n.id}
+              isAdmin={canConnect}
+              tenantId={ctx.tenantId}
+              sessionId={n.id}
+              label={n.label}
+              showLabel={numbers.length > 1}
+              initial={{ status: n.status, phone: n.phone, last_error: n.last_error, qr: qrs[n.id] ?? null }}
+            />
+          ))
       )}
 
       <div className="flex h-[calc(100dvh-9rem)] min-h-[32rem] overflow-hidden rounded-2xl border border-line bg-surface shadow-sm md:h-[calc(100dvh-5rem)]">
@@ -104,17 +135,30 @@ export default async function WhatsappPage({ searchParams }: PageProps<"/whatsap
             <h1 className="text-lg font-semibold">Conversas</h1>
             <MessageCircle className="h-5 w-5 text-muted" />
           </header>
-          {session.status === "conectado" && (
-            <ConnectionPanel
-              compact
-              isAdmin={can(ctx, "whatsapp.conectar")}
-              tenantId={ctx.tenantId}
-              initial={{ status: session.status, phone: session.phone, last_error: session.last_error, qr }}
+          {numbers
+            .filter((n) => n.status === "conectado")
+            .map((n) => (
+              <ConnectionPanel
+                key={n.id}
+                compact
+                isAdmin={canConnect}
+                tenantId={ctx.tenantId}
+                sessionId={n.id}
+                label={n.label}
+                showLabel={numbers.length > 1}
+                initial={{ status: n.status, phone: n.phone, last_error: n.last_error, qr: null }}
+              />
+            ))}
+          {canConnect && numbers.length > 0 && (
+            <NumbersManager
+              numbers={numbers.map((n) => ({ id: n.id, label: n.label, is_primary: n.is_primary, status: n.status, phone: n.phone }))}
+              limit={limit}
             />
           )}
           <ConversationList
             selectedId={contact?.id ?? null}
             tagLinks={tagLinks}
+            numberLinks={numberLinks}
             items={conversations.map((c) => ({ ...c, href: qs({ contato: c.contact_id }) }))}
           />
         </aside>
@@ -174,7 +218,9 @@ export default async function WhatsappPage({ searchParams }: PageProps<"/whatsap
                 contactId={contact.id}
                 canSend={!!contact.phone}
                 canWrite={can(ctx, "whatsapp.enviar")}
-                connected={session.status === "conectado"}
+                connected={connectedNumbers.length > 0}
+                numbers={connectedNumbers.map((n) => ({ id: n.id, label: n.label, phone: n.phone }))}
+                defaultSessionId={currentConversation?.session_id ?? null}
                 quickReplies={quickReplies}
                 messages={thread}
                 pending={pending}

@@ -7,7 +7,13 @@ import { EmptyState } from "@/components/empty-state";
 import { dateTime } from "@/components/format";
 import { currentMonth, monthLabel, shiftMonth } from "@/shared/months";
 import { NICHE_KEYS, NICHES } from "@/shared/niches";
-import { createClientTenantAction, deleteClientTenantAction, resetClientPasswordAction, setClientSuspendedAction } from "./actions";
+import {
+  createClientTenantAction,
+  deleteClientTenantAction,
+  resetClientPasswordAction,
+  setClientSuspendedAction,
+  setWhatsappLimitAction,
+} from "./actions";
 
 const WA_LABEL: Record<string, { label: string; cls: string }> = {
   conectado: { label: "Conectado", cls: "text-success" },
@@ -127,7 +133,21 @@ export default async function PlataformaPage() {
                       </td>
                       <td className="px-5 py-3 text-right tabular-nums">{num(c.members)}</td>
                       <td className="px-5 py-3 text-right tabular-nums">{num(c.contacts)}</td>
-                      <td className={`whitespace-nowrap px-5 py-3 font-medium ${wa.cls}`}>{wa.label}</td>
+                      <td className="whitespace-nowrap px-5 py-3">
+                        <span className={`block font-medium ${wa.cls}`}>{wa.label}</span>
+                        <span className="block text-xs text-subtle">
+                          {num(c.whatsapp_connected ?? 0)}/{num(c.whatsapp_numbers ?? 0)} número(s) · limite {num(c.whatsapp_limit ?? 1)}
+                        </span>
+                        <details className="relative">
+                          <summary className="cursor-pointer list-none text-xs text-accent hover:underline">alterar limite</summary>
+                          <div className="absolute left-0 z-10 mt-1 w-56 rounded-xl border border-line bg-surface p-3 shadow-xl">
+                            <ActionForm action={setWhatsappLimitAction} className="flex items-center gap-2" submitLabel="Salvar" submitClassName="btn-primary btn-sm">
+                              <input type="hidden" name="id" value={c.id} />
+                              <input name="limite" type="number" min={1} max={20} defaultValue={c.whatsapp_limit ?? 1} className="input w-20 py-1 text-sm" aria-label="Limite de números de WhatsApp" />
+                            </ActionForm>
+                          </div>
+                        </details>
+                      </td>
                       <td className="px-5 py-3 text-muted">{AI_LABEL[c.ai_mode ?? "desligado"] ?? "—"}</td>
                       <td className="whitespace-nowrap px-5 py-3 text-right tabular-nums text-muted">
                         {num(c.ai_messages_month)} resp. · {num(Math.round(c.ai_tokens_month / 1000))} mil tokens

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { AlarmClock, Bot, Check, CheckCheck, Clock, Download, FileText, Sparkles, TriangleAlert, X } from "lucide-react";
 import { dateTime, dayLabel, sameDay, timeOnly } from "@/components/format";
 import { cancelScheduledAction, setSuggestionStatusAction } from "../actions";
-import { Composer, type QuickReplyItem } from "./composer";
+import { Composer, type SendingNumber, type QuickReplyItem } from "./composer";
 
 function StatusIcon({ status }: { status: string | null }) {
   if (status === "lido") return <CheckCheck className="h-4 w-4" style={{ color: "var(--wa-tick-read)" }} aria-label="lida" />;
@@ -24,6 +24,8 @@ export function ChatThread({
   suggestion = null,
   quickReplies = [],
   connected = true,
+  numbers = [],
+  defaultSessionId = null,
 }: {
   contactId: string;
   canSend: boolean;
@@ -42,6 +44,9 @@ export function ChatThread({
   suggestion?: { id: string; body: string } | null;
   quickReplies?: QuickReplyItem[];
   connected?: boolean;
+  /** Números conectados (para escolher por qual enviar, se houver mais de um). */
+  numbers?: SendingNumber[];
+  defaultSessionId?: string | null;
 }) {
   const router = useRouter();
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -166,7 +171,15 @@ export function ChatThread({
         {!canWrite ? (
           <p className="text-sm text-muted">Você pode ver esta conversa, mas não tem permissão para enviar mensagens.</p>
         ) : canSend ? (
-          <Composer contactId={contactId} quickReplies={quickReplies} connected={connected} inputRef={inputRef} prefill={prefill} />
+          <Composer
+            contactId={contactId}
+            quickReplies={quickReplies}
+            connected={connected}
+            inputRef={inputRef}
+            prefill={prefill}
+            numbers={numbers}
+            defaultSessionId={defaultSessionId}
+          />
         ) : (
           <p className="text-sm text-muted">Cadastre o telefone do contato para enviar mensagens.</p>
         )}

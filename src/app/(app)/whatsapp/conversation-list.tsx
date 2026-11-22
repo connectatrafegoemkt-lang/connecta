@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Check, CheckCheck, Inbox, Search } from "lucide-react";
+import { Check, CheckCheck, Inbox, Search, Smartphone } from "lucide-react";
 import { Avatar } from "@/components/avatar";
 import { listTime } from "@/components/format";
 
@@ -15,6 +15,7 @@ export interface ConversationItem {
   last_body: string;
   last_direction: string;
   last_status: string | null;
+  session_id?: string | null;
   tags: { id: string; name: string; color: string }[];
   href: string;
 }
@@ -30,10 +31,13 @@ export function ConversationList({
   items,
   selectedId,
   tagLinks,
+  numberLinks = [],
 }: {
   items: ConversationItem[];
   selectedId: string | null;
   tagLinks: { id: string | null; name: string; color?: string; href: string; active: boolean }[];
+  /** Filtro por número de WhatsApp (só quando o cliente tem mais de um). */
+  numberLinks?: { id: string | null; name: string; href: string; active: boolean }[];
 }) {
   const [q, setQ] = useState("");
   const filtered = useMemo(() => {
@@ -62,6 +66,21 @@ export function ConversationList({
           />
         </label>
       </div>
+      {numberLinks.length > 1 && (
+        <div className="flex gap-1.5 overflow-x-auto px-3 pb-2">
+          {numberLinks.map((n) => (
+            <Link
+              key={n.id ?? "todos"}
+              href={n.href}
+              className={`flex shrink-0 items-center gap-1 rounded-md border px-2 py-0.5 text-xs transition ${
+                n.active ? "border-[var(--wa-green)] text-fg" : "border-line text-muted hover:text-fg"
+              }`}
+            >
+              <Smartphone className="h-3 w-3" /> {n.name}
+            </Link>
+          ))}
+        </div>
+      )}
       {tagLinks.length > 1 && (
         <div className="flex gap-1.5 overflow-x-auto px-3 pb-2">
           {tagLinks.map((t) => (

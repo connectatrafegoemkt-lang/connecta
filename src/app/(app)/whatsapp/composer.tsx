@@ -13,13 +13,23 @@ export interface QuickReplyItem {
 }
 
 /** Campo de mensagem do WhatsApp: texto, anexo, áudio gravado, agendamento e mensagens rápidas. */
+export interface SendingNumber {
+  id: string;
+  label: string;
+  phone: string | null;
+}
+
 export function Composer({
   contactId,
   quickReplies,
   connected,
   inputRef,
   prefill,
+  numbers = [],
+  defaultSessionId = null,
 }: {
+  numbers?: SendingNumber[];
+  defaultSessionId?: string | null;
   contactId: string;
   quickReplies: QuickReplyItem[];
   connected: boolean;
@@ -29,6 +39,10 @@ export function Composer({
 }) {
   const router = useRouter();
   const [text, setText] = useState("");
+  // Por qual número enviar (só aparece com mais de um conectado).
+  const [sessionId, setSessionId] = useState<string>(
+    numbers.some((n) => n.id === defaultSessionId) ? (defaultSessionId as string) : (numbers[0]?.id ?? ""),
+  );
   const [lastPrefill, setLastPrefill] = useState<number | null>(null);
   if (prefill && prefill.nonce !== lastPrefill) {
     setLastPrefill(prefill.nonce);
@@ -116,6 +130,7 @@ export function Composer({
       if (file || audio) {
         const fd = new FormData();
         fd.set("contact_id", contactId);
+        if (numbers.length > 1 && sessionId) fd.set("session_id", sessionId);
         fd.set("caption", audio ? "" : body);
         if (scheduledIso) fd.set("scheduled_at", new Date(scheduledIso).toISOString());
         if (audio) {
@@ -130,6 +145,7 @@ export function Composer({
       } else {
         const fd = new FormData();
         fd.set("contact_id", contactId);
+        if (numbers.length > 1 && sessionId) fd.set("session_id", sessionId);
         fd.set("body", body);
         if (scheduledIso) fd.set("scheduled_at", scheduledIso);
         const r = await whatsappSendAction({}, fd);
@@ -145,6 +161,21 @@ export function Composer({
 
   return (
     <div className="relative">
+      {numbers.length > 1 && (
+        <label className="mb-1.5 flex items-center gap-2 text-xs text-muted">
+          Enviar por
+          <select
+            value={sessionId}
+            onChange={(e) => setSessionId(e.target.value)}
+            className="rounded-md border border-line bg-surface px-2 py-0.5 text-xs text-fg"
+            aria-label="Número de WhatsApp que vai enviar"
+          >
+            {numbers.map((n) => (
+              <option key={n.id} value={n.id}>{n.label}{n.phone ? ` (+${n.phone})` : ""}</option>
+            ))}
+          </select>
+        </label>
+      )}
       {matches.length > 0 && (
         <ul className="absolute bottom-full left-0 right-0 mb-2 max-h-64 overflow-y-auto rounded-xl border border-line bg-surface p-1 shadow-lg" role="listbox">
           {matches.map((q) => (
