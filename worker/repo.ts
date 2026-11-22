@@ -89,6 +89,7 @@ export class WorkerTenantRepo implements InboundRepo, LabelRepo {
     phone?: string | null;
     last_error?: string | null;
     connected_at?: string | null;
+    reset_requested_at?: string | null;
   }) {
     const { error } = await this.sb
       .from("whatsapp_sessions")
@@ -552,17 +553,24 @@ export class WorkerTenantRepo implements InboundRepo, LabelRepo {
 export async function listSessionStates(sb: SupabaseClient) {
   const { data, error } = await sb
     .from("whatsapp_sessions")
-    .select("tenant_id, desired_state, status, tenants(suspended_at)");
+    .select("tenant_id, desired_state, status, reset_requested_at, tenants(suspended_at)");
   if (error) throw error;
   type Row = {
     tenant_id: string;
     desired_state: "conectado" | "desconectado";
     status: string;
+    reset_requested_at: string | null;
     tenants: { suspended_at: string | null } | { suspended_at: string | null }[] | null;
   };
   return ((data ?? []) as unknown as Row[]).map((r) => {
     const t = Array.isArray(r.tenants) ? r.tenants[0] : r.tenants;
-    return { tenant_id: r.tenant_id, desired_state: r.desired_state, status: r.status, suspended: Boolean(t?.suspended_at) };
+    return {
+      tenant_id: r.tenant_id,
+      desired_state: r.desired_state,
+      status: r.status,
+      reset_requested_at: r.reset_requested_at,
+      suspended: Boolean(t?.suspended_at),
+    };
   });
 
 }
