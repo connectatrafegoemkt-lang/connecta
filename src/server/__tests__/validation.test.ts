@@ -32,3 +32,15 @@ describe("schemas de entrada rejeitam tenant_id do cliente", () => {
     expect(interactionCreateSchema.safeParse({ contact_id: OTHER, type: "whatsapp", body: "x" }).success).toBe(false);
   });
 });
+
+describe("senha provisória / troca de senha", () => {
+  it("exige 10+ caracteres e confirmação igual", async () => {
+    const { passwordChangeSchema, passwordResetSchema, platformPasswordResetSchema } = await import("../validation");
+    expect(passwordChangeSchema.safeParse({ senha: "curta", confirmacao: "curta" }).success).toBe(false);
+    expect(passwordChangeSchema.safeParse({ senha: "senha-longa-123", confirmacao: "outra-senha-123" }).success).toBe(false);
+    expect(passwordChangeSchema.safeParse({ senha: "senha-longa-123", confirmacao: "senha-longa-123" }).success).toBe(true);
+    expect(passwordChangeSchema.safeParse({ senha: "senha-longa-123", confirmacao: "senha-longa-123", user_id: "x" }).success).toBe(false);
+    expect(passwordResetSchema.safeParse({ senha: "provisoria-1" }).success).toBe(true);
+    expect(platformPasswordResetSchema.safeParse({ email: "a@b.com", senha: "provisoria-1", tenant_id: "x" }).success).toBe(false);
+  });
+});

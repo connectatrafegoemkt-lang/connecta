@@ -21,9 +21,11 @@ import {
   taskUpdateSchema,
   whatsappSendSchema,
   quickReplySchema,
+  passwordResetSchema,
   contactFieldSchema,
   nicheSetupSchema,
 } from "@/server/validation";
+import { resetMemberPassword } from "@/server/account";
 import { createContactField, deleteContactField } from "@/server/data/contact-fields";
 import { applyNicheSetup, skipNicheSetup } from "@/server/data/onboarding";
 import { createContact, deleteContact, moveContact, updateContact } from "@/server/data/contacts";
@@ -262,6 +264,18 @@ export async function removeMemberAction(_: ActionState, fd: FormData): Promise<
     await removeMember(ctx, parseOrThrow(idSchema, fd.get("id")));
     revalidatePath("/equipe");
     return { ok: true };
+  } catch (e) {
+    return toActionError(e);
+  }
+}
+
+export async function resetMemberPasswordAction(_: ActionState, fd: FormData): Promise<ActionState> {
+  try {
+    const ctx = await getTenantContext();
+    const id = parseOrThrow(idSchema, fd.get("id"));
+    const { senha } = parseOrThrow(passwordResetSchema, pick(fd, ["senha"]));
+    await resetMemberPassword(ctx, id, senha);
+    return { ok: true, message: "Senha provisória definida. A pessoa vai criar a senha dela no próximo acesso." };
   } catch (e) {
     return toActionError(e);
   }

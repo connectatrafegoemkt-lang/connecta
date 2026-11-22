@@ -1,11 +1,11 @@
-import { Ban, Trash2, Bot, Building2, CirclePlay, Contact, MessageCircle, Plus, ShieldCheck, Users } from "lucide-react";
+import { Ban, KeyRound, Trash2, Bot, Building2, CirclePlay, Contact, MessageCircle, Plus, ShieldCheck, Users } from "lucide-react";
 import { getPlatformContext, listClientTenants } from "@/server/platform";
 import { ActionForm } from "@/components/action-form";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { dateTime } from "@/components/format";
 import { NICHE_KEYS, NICHES } from "@/shared/niches";
-import { createClientTenantAction, deleteClientTenantAction, setClientSuspendedAction } from "./actions";
+import { createClientTenantAction, deleteClientTenantAction, resetClientPasswordAction, setClientSuspendedAction } from "./actions";
 
 const WA_LABEL: Record<string, { label: string; cls: string }> = {
   conectado: { label: "Conectado", cls: "text-success" },
@@ -65,7 +65,7 @@ export default async function PlataformaPage() {
           <label><span className="label">Identificador (opcional)</span><input name="slug" maxLength={40} pattern="[a-z0-9](?:[a-z0-9\-]{0,38}[a-z0-9])?" placeholder="gerado a partir do nome" className="input font-mono" /></label>
           <label><span className="label">Nome do administrador *</span><input name="admin_name" required maxLength={100} placeholder="Ex.: Dra. Ana Silva" className="input" /></label>
           <label><span className="label">E-mail do administrador *</span><input name="admin_email" type="email" required placeholder="ana@silvasouza.adv.br" className="input" /></label>
-          <label><span className="label">Senha inicial * (10+ caracteres)</span><input name="admin_password" type="password" required minLength={10} autoComplete="new-password" className="input" /></label>
+          <label><span className="label">Senha provisória * (10+ caracteres; ele troca no 1º acesso)</span><input name="admin_password" type="password" required minLength={10} autoComplete="new-password" className="input" /></label>
           <label><span className="label">Nicho (opcional)</span>
             <select name="niche" defaultValue="" className="input">
               <option value="">O cliente escolhe no primeiro acesso</option>
@@ -118,6 +118,21 @@ export default async function PlataformaPage() {
                       </td>
                       <td className="whitespace-nowrap px-5 py-3 text-muted">{dateTime(c.created_at)}</td>
                       <td className="px-5 py-3">
+                        <div className="flex items-center gap-2">
+                        <details className="relative">
+                          <summary className="btn-secondary btn-sm cursor-pointer list-none whitespace-nowrap">
+                            <KeyRound className="h-3.5 w-3.5" /> Senha
+                          </summary>
+                          <div className="absolute right-0 z-10 mt-2 w-80 rounded-xl border border-line bg-surface p-3 text-left shadow-xl">
+                            <p className="text-sm font-medium">Redefinir senha de alguém de {c.name}</p>
+                            <p className="mt-1 text-xs text-muted">A pessoa entra com a senha provisória e cria a senha pessoal dela no próximo acesso.</p>
+                            <ActionForm action={resetClientPasswordAction} resetOnSuccess className="mt-3 space-y-2" submitLabel="Definir senha provisória" submitIcon={<KeyRound className="h-3.5 w-3.5" />} submitClassName="btn-primary btn-sm w-full">
+                              <input type="hidden" name="id" value={c.id} />
+                              <input name="email" type="email" required placeholder="E-mail do usuário" className="input py-1.5 text-sm" aria-label="E-mail do usuário" />
+                              <input name="senha" type="text" required minLength={10} maxLength={200} autoComplete="off" placeholder="Senha provisória (10+)" className="input py-1.5 text-sm" aria-label="Senha provisória" />
+                            </ActionForm>
+                          </div>
+                        </details>
                         {c.suspended_at ? (
                           <div className="flex items-center gap-2">
                             <ActionForm action={setClientSuspendedAction} submitLabel="Reativar" submitIcon={<CirclePlay className="h-3.5 w-3.5" />} submitClassName="btn-primary btn-sm whitespace-nowrap">
@@ -161,6 +176,7 @@ export default async function PlataformaPage() {
                             </div>
                           </details>
                         )}
+                        </div>
                       </td>
                     </tr>
                   );

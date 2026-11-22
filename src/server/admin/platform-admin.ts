@@ -4,6 +4,7 @@ import { randomBytes } from "node:crypto";
 import { badRequest, HttpError } from "../errors";
 import type { PlatformContext } from "../platform";
 import { supabaseAdmin } from "./supabase-admin";
+import { MUST_CHANGE } from "./passwords";
 
 export function slugify(name: string): string {
   return name
@@ -38,6 +39,7 @@ export async function createClientTenant(
     email: input.admin_email,
     password: input.admin_password,
     email_confirm: true,
+    app_metadata: MUST_CHANGE, // senha provisória: troca obrigatória no 1º acesso
   });
   if (error || !u.user) throw badRequest("Não foi possível criar o login (e-mail já cadastrado?)");
 
