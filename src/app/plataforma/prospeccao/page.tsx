@@ -186,7 +186,10 @@ export default async function ProspeccaoPage({ searchParams }: PageProps<"/plata
               <li>Em <strong>Compartilhar</strong>, deixe “Qualquer pessoa com o link” como <strong>Leitor</strong>. Atenção: quem tiver o link consegue ver a planilha.</li>
               <li>Cole o link aqui. Para outra aba, abra a aba e copie o link (ele inclui o <span className="font-mono">gid</span>).</li>
             </ol>
-            <p className="mt-1">Cada linha entra uma única vez (pelo telefone, e-mail ou nome). Lead excluída aqui não volta.</p>
+            <p className="mt-1">
+              Linhas novas viram leads. Se você preencher uma coluna depois (ex.: Instagram), a lead é completada na próxima leitura, sem apagar o
+              que foi editado aqui. Lead excluída aqui não volta.
+            </p>
           </div>
         </div>
       </details>
@@ -294,9 +297,10 @@ export default async function ProspeccaoPage({ searchParams }: PageProps<"/plata
                 {list.map((x) => {
                   const late = isOpen(x.status) && x.next_followup_at && new Date(x.next_followup_at).getTime() < now;
                   return (
-                    <tr key={x.id} className="hover:bg-surface-2/40">
+                    <tr key={x.id} className="relative cursor-pointer hover:bg-surface-2/40">
                       <td className="px-5 py-3">
-                        <Link href={href(etapa, x.id)} scroll={false} className="block font-medium hover:underline">{x.name}</Link>
+                        {/* link "esticado": clicar em qualquer ponto da linha abre a ficha */}
+                        <Link href={href(etapa, x.id)} scroll={false} className="block font-medium after:absolute after:inset-0 hover:underline" title="Abrir ficha da lead">{x.name}</Link>
                         <span className="block text-xs text-subtle">
                           {[x.company, x.area ?? x.niche, x.city].filter(Boolean).join(" · ") || phoneFmt(x.phone)}
                         </span>
@@ -310,7 +314,7 @@ export default async function ProspeccaoPage({ searchParams }: PageProps<"/plata
                         {x.activities ? <span className="block text-xs text-subtle">{x.activities} contato(s)</span> : null}
                       </td>
                       <td className="whitespace-nowrap px-5 py-3 text-right tabular-nums">{Number(x.value_cents) ? brl(Number(x.value_cents)) : "—"}</td>
-                      <td className="px-5 py-3">
+                      <td className="relative z-10 px-5 py-3">
                         <span className="flex items-center justify-end gap-1">
                           <WhatsappDialog id={x.id} name={x.name} phone={x.phone} quickReplies={wa.quickReplies} connected={wa.connected} />
                           <ContactButtons phone={x.phone} name={x.name} />
