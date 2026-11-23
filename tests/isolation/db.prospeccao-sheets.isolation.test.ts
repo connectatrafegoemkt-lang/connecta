@@ -53,7 +53,8 @@ describe("planilhas do Google Sheets na prospecção", () => {
     const n = await as(P(), (q) => q<{ n: number }>("select public.platform_sheet_sync($1, $2::jsonb) as n", [sourceId, JSON.stringify(later)]));
     expect(n.rows[0].n).toBe(0); // nenhuma nova
     const ps = await raw<{ name: string; instagram: string; area: string | null; company: string }>(
-      "select name, instagram, area, company from app.prospects where created_by = $1 order by name",
+      // ordem que não depende do idioma do banco (Ana tem telefone, João não)
+      "select name, instagram, area, company from app.prospects where created_by = $1 order by phone nulls first",
       [platformUser],
     );
     expect(ps).toEqual([
