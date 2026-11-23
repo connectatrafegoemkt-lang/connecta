@@ -7,7 +7,7 @@ import { HttpError } from "@/server/errors";
 import { idSchema } from "@/server/validation";
 import { ActionForm } from "@/components/action-form";
 import { brl, dateTime, phoneFmt, toLocalInput } from "@/components/format";
-import { ACTIVITY_LABEL, ACTIVITY_TYPES, PROSPECT_STATUS, STATUS_LABEL, type ProspectStatus } from "@/shared/prospects";
+import { ACTIVITY_LABEL, ACTIVITY_TYPES, instagramUrl, PROSPECT_STATUS, STATUS_LABEL, type ProspectStatus } from "@/shared/prospects";
 import { deleteProspectAction, logContactAction, updateProspectAction } from "../actions";
 import { ContactButtons, FollowupPicker, StatusBadge } from "../bits";
 import { WhatsappDialog } from "../whatsapp-dialog";
@@ -39,7 +39,10 @@ export default async function ProspectPage({ params }: PageProps<"/plataforma/pr
       <div className="card flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-xl font-semibold">{x.name}</h1>
-          <p className="text-sm text-muted">{[x.company, x.city, x.niche].filter(Boolean).join(" · ") || "—"}</p>
+          <p className="text-sm text-muted">{[x.company, x.area, x.niche, x.city].filter(Boolean).join(" · ") || "—"}</p>
+          {x.instagram && (
+            <a href={instagramUrl(x.instagram)} target="_blank" rel="noopener noreferrer" className="text-sm text-accent hover:underline">@{x.instagram}</a>
+          )}
           <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
             <StatusBadge status={x.status} />
             {x.phone && <span className="chip">{phoneFmt(x.phone)}</span>}
@@ -65,6 +68,8 @@ export default async function ProspectPage({ params }: PageProps<"/plataforma/pr
               <label className="block"><span className="label">E-mail</span><input name="email" type="email" defaultValue={x.email ?? ""} className="input" /></label>
               <label className="block"><span className="label">Cidade</span><input name="city" maxLength={120} defaultValue={x.city ?? ""} className="input" /></label>
               <label className="block"><span className="label">Nicho</span><input name="niche" maxLength={120} defaultValue={x.niche ?? ""} className="input" /></label>
+              <label className="block"><span className="label">Área de atuação</span><input name="area" maxLength={120} defaultValue={x.area ?? ""} className="input" /></label>
+              <label className="block"><span className="label">Instagram</span><input name="instagram" defaultValue={x.instagram ?? ""} placeholder="@usuario" className="input" /></label>
               <label className="block"><span className="label">Origem</span><input name="source" maxLength={120} defaultValue={x.source ?? ""} className="input" /></label>
               <label className="block"><span className="label">Valor (R$/mês)</span><input name="value" inputMode="decimal" defaultValue={(Number(x.value_cents) / 100).toFixed(2).replace(".", ",")} className="input" /></label>
             </div>
