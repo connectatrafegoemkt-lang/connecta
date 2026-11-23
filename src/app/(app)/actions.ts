@@ -413,6 +413,8 @@ export async function cancelScheduledAction(id: string): Promise<ActionState> {
   try {
     await cancelScheduled(await getTenantContext(), parseOrThrow(idSchema, id));
     revalidatePath("/whatsapp");
+    revalidatePath("/whatsapp/agendadas");
+    revalidatePath("/plataforma/prospeccao");
     return { ok: true };
   } catch (e) {
     return toActionError(e);
