@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { AtSign, FileSpreadsheet, RefreshCw, Trash2, AlarmClock, CalendarClock, ChevronRight, ClipboardPaste, HandCoins, Plus, Search, Target, Trophy, UserPlus } from "lucide-react";
+import { ArrowDownAZ, AtSign, Clock, FileSpreadsheet, RefreshCw, Trash2, AlarmClock, CalendarClock, ChevronRight, ClipboardPaste, HandCoins, Plus, Search, Target, Trophy, UserPlus } from "lucide-react";
 import { getPlatformContext } from "@/server/platform";
 import { getProspect, listProspects, listSheetSources, syncDueSheets } from "@/server/prospects";
 import { idSchema } from "@/server/validation";
@@ -13,6 +13,8 @@ import { isOpen, PROSPECT_STATUS, STATUS_LABEL } from "@/shared/prospects";
 import { addSheetAction, createProspectAction, deleteSheetAction, importProspectsAction, syncSheetAction } from "./actions";
 import { ContactButtons, FollowupPicker, StatusBadge } from "./bits";
 import { WhatsappDialog } from "./whatsapp-dialog";
+import { ScheduledList } from "@/components/scheduled-list";
+import { cancelScheduledAction } from "@/app/(app)/actions";
 import { ownWhatsappInfo } from "./whatsapp-info";
 
 export const metadata = { title: "Prospecção" };
@@ -30,6 +32,7 @@ export default async function ProspeccaoPage({ searchParams }: PageProps<"/plata
   const sp = await searchParams;
   const etapa = typeof sp.etapa === "string" && (PROSPECT_STATUS as readonly string[]).includes(sp.etapa) ? sp.etapa : null;
   const q = typeof sp.q === "string" ? sp.q.trim().toLowerCase().slice(0, 100) : "";
+  const ordem = sp.ordem === "recentes" || sp.ordem === "az" ? sp.ordem : "followup";
   // Planilhas do Google Sheets: lê as que não foram lidas nos últimos 5 min
   // (com tempo máximo, para a página não ficar presa se o Google demorar).
   await Promise.race([syncDueSheets(p).catch(() => 0), new Promise((r) => setTimeout(r, 8000))]);
@@ -42,6 +45,11 @@ export default async function ProspeccaoPage({ searchParams }: PageProps<"/plata
   ]);
 
   const now = nowMs();
+  // Agendadas: só as mensagens para leads da prospecção (pelo telefone) e
+  // o nome clicável abre a ficha da lead.
+  const byPhone = new Map(all.filter((x) => x.phone).map((x) => [x.phone!, x.id]));
+  const scheduledAll = wa.scheduled ?? [];
+  const scheduled = scheduledAll.filter((m) => m.contact_phone && byPhone.has(m.contact_phone));
   const eod = endOfTodaySP();
   const due = all
     .filter((x) => isOpen(x.status) && x.next_followup_at && new Date(x.next_followup_at).getTime() <= eod)
@@ -54,7 +62,13 @@ export default async function ProspeccaoPage({ searchParams }: PageProps<"/plata
       [x.name, x.company, x.city, x.niche, x.email].some((v) => v?.toLowerCase().includes(q)) ||
       (digits.length >= 3 && (x.phone ?? "").includes(digits)),
     )
-    .sort((a, b) => (a.next_followup_at ?? "9999").localeCompare(b.next_followup_at ?? "9999"));
+    .sort((a, b) =>
+      ordem === "az"
+        ? a.name.localeCompare(b.name, "pt-BR", { sensitivity: "base" })
+        : ordem === "recentes"
+          ? b.created_at.localeCompare(a.created_at)
+          : (a.next_followup_at ?? "9999").localeCompare(b.next_followup_at ?? "9999"),
+    );
 
   const monthStart = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" }).slice(0, 7);
   const open = all.filter((x) => isOpen(x.status));
@@ -66,14 +80,18 @@ export default async function ProspeccaoPage({ searchParams }: PageProps<"/plata
   ];
   const counts = new Map<string, number>();
   for (const x of all) counts.set(x.status, (counts.get(x.status) ?? 0) + 1);
-  const href = (e: string | null, lead?: string) => {
+  const href = (e: string | null, lead?: string, o: string = ordem) => {
     const u = new URLSearchParams();
     if (e) u.set("etapa", e);
     if (q) u.set("q", q);
+    if (o !== "followup") u.set("ordem", o);
     if (lead) u.set("lead", lead);
     const s = u.toString();
     return s ? `/plataforma/prospeccao?${s}` : "/plataforma/prospeccao";
   };
+  const scheduledHref = new Map(
+    scheduled.map((m) => [m.contact_id, href(etapa, byPhone.get(m.contact_phone!))] as const),
+  );
 
   return (
     <div className="space-y-8">
@@ -198,6 +216,24 @@ export default async function ProspeccaoPage({ searchParams }: PageProps<"/plata
         </section>
       )}
 
+      {wa.connected !== null && (
+        <details className="card" open={scheduled.length > 0 && scheduled.length <= 5}>
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-2">
+            <span className="section-title"><CalendarClock className="h-4 w-4 text-accent" /> Mensagens agendadas</span>
+            <span className="text-xs text-muted">{scheduled.length} esperando envio</span>
+          </summary>
+          <div className="mt-2">
+            <ScheduledList
+              items={scheduled}
+              cancel={cancelScheduledAction}
+              canCancel
+              hrefs={Object.fromEntries(scheduledHref)}
+              empty="Nenhuma mensagem agendada para as leads. Use o botão de WhatsApp da lead e escolha “Agendar”."
+            />
+          </div>
+        </details>
+      )}
+
       <section className="card overflow-hidden p-0">
         <div className="flex flex-wrap items-center justify-between gap-3 px-5 pt-5">
           <div className="flex flex-wrap gap-1.5">
@@ -208,13 +244,34 @@ export default async function ProspeccaoPage({ searchParams }: PageProps<"/plata
               </Link>
             ))}
           </div>
+          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-1 rounded-lg border border-line p-0.5 text-xs" role="group" aria-label="Ordenar">
+            {([
+              ["followup", "Próximo follow-up"],
+              ["recentes", "Mais recentes"],
+              ["az", "A–Z"],
+            ] as const).map(([k, l]) => (
+              <Link
+                key={k}
+                href={href(etapa, undefined, k)}
+                scroll={false}
+                aria-current={ordem === k ? "true" : undefined}
+                className={`flex items-center gap-1 rounded-md px-2 py-1 ${ordem === k ? "bg-brand-500/15 font-medium text-accent-strong" : "text-muted hover:text-fg"}`}
+              >
+                {k === "az" ? <ArrowDownAZ className="h-3.5 w-3.5" /> : k === "recentes" ? <Clock className="h-3.5 w-3.5" /> : <CalendarClock className="h-3.5 w-3.5" />}
+                {l}
+              </Link>
+            ))}
+          </div>
           <form action="/plataforma/prospeccao" className="flex items-center gap-2">
             {etapa && <input type="hidden" name="etapa" value={etapa} />}
+            {ordem !== "followup" && <input type="hidden" name="ordem" value={ordem} />}
             <label className="relative">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-subtle" />
               <input name="q" defaultValue={q} placeholder="Buscar nome, empresa, cidade…" className="input py-1.5 pl-9 text-sm" aria-label="Buscar" />
             </label>
           </form>
+          </div>
         </div>
         {list.length === 0 ? (
           <div className="p-5">

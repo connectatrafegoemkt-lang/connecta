@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
-import { ArrowLeft, MessageCircle } from "lucide-react";
+import Link from "next/link";
+import { ArrowLeft, CalendarClock, MessageCircle } from "lucide-react";
 import { can, getTenantContext } from "@/server/context";
 import { getContact } from "@/server/data/contacts";
 import {
@@ -12,7 +13,7 @@ import {
 } from "@/server/data/whatsapp";
 import { idSchema } from "@/server/validation";
 import { getAiSettings, listPendingSuggestion } from "@/server/data/ai";
-import { listQuickReplies, signedUrlsFor } from "@/server/data/whatsapp-media";
+import { countScheduledMessages, listQuickReplies, signedUrlsFor } from "@/server/data/whatsapp-media";
 import { listTags } from "@/server/data/tags";
 import { listStages } from "@/server/data/stages";
 import { listDepartments } from "@/server/data/departments";
@@ -40,7 +41,7 @@ export default async function WhatsappPage({ searchParams }: PageProps<"/whatsap
   const tagFilter = idSchema.safeParse(sp.etiqueta).success ? (sp.etiqueta as string) : undefined;
   const numberFilter = idSchema.safeParse(sp.numero).success ? (sp.numero as string) : undefined;
 
-  const [numbers, qrs, limit, conversations, aiSettings, quickReplies, tags] = await Promise.all([
+  const [numbers, qrs, limit, conversations, aiSettings, quickReplies, tags, scheduledCount] = await Promise.all([
     listWhatsappNumbers(ctx),
     getWhatsappQrs(ctx),
     getWhatsappLimit(ctx),
@@ -48,6 +49,7 @@ export default async function WhatsappPage({ searchParams }: PageProps<"/whatsap
     getAiSettings(ctx),
     listQuickReplies(ctx),
     listTags(ctx),
+    countScheduledMessages(ctx),
   ]);
   const qs = (extra: Record<string, string | undefined>) => {
     const p = new URLSearchParams();
@@ -133,7 +135,14 @@ export default async function WhatsappPage({ searchParams }: PageProps<"/whatsap
         <aside className={`flex w-full flex-col border-r border-line md:w-[23rem] md:shrink-0 ${contact ? "hidden md:flex" : "flex"}`}>
           <header className="flex h-[3.75rem] items-center justify-between px-4" style={{ background: "var(--wa-panel)" }}>
             <h1 className="text-lg font-semibold">Conversas</h1>
-            <MessageCircle className="h-5 w-5 text-muted" />
+            <Link href="/whatsapp/agendadas" className="icon-btn relative" title="Mensagens agendadas" aria-label="Mensagens agendadas">
+              <CalendarClock className="h-5 w-5" />
+              {scheduledCount > 0 && (
+                <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-semibold text-white" style={{ background: "var(--wa-green)" }}>
+                  {scheduledCount > 99 ? "99+" : scheduledCount}
+                </span>
+              )}
+            </Link>
           </header>
           {numbers
             .filter((n) => n.status === "conectado")
