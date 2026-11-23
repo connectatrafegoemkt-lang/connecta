@@ -44,6 +44,26 @@ describe("planilhas do Google Sheets na prospecção", () => {
     expect(p.source).toBe("Google Sheets: Leads OAB");
   });
 
+  it("coluna preenchida depois na planilha (ex.: Instagram) chega à lead, sem apagar o que foi digitado no CRM", async () => {
+    await raw("update app.prospects set company = 'Editado no CRM' where email = 'joao@lima.adv.br' and created_by = $1", [platformUser]);
+    const later = [
+      { ...rows[0], instagram: "dra.ana", area: "Trabalhista" },
+      { ...rows[1], instagram: "joao.lima", company: "Lima Sociedade" },
+    ];
+    const n = await as(P(), (q) => q<{ n: number }>("select public.platform_sheet_sync($1, $2::jsonb) as n", [sourceId, JSON.stringify(later)]));
+    expect(n.rows[0].n).toBe(0); // nenhuma nova
+    const ps = await raw<{ name: string; instagram: string; area: string | null; company: string }>(
+      "select name, instagram, area, company from app.prospects where created_by = $1 order by name",
+      [platformUser],
+    );
+    expect(ps).toEqual([
+      { name: "Dr. João", instagram: "joao.lima", area: null, company: "Editado no CRM" },
+      { name: "Dra. Ana", instagram: "dra.ana", area: "Trabalhista", company: "Souza Adv" },
+    ]);
+    const l = await as(P(), (q) => q<{ l: { id: string; last_result: string }[] }>("select public.platform_sheet_sources_list() as l"));
+    expect(l.rows[0].l.find((x) => x.id === sourceId)!.last_result).toBe("2 lead(s) atualizada(s)");
+  });
+
   it("lead excluída no CRM não volta na próxima leitura", async () => {
     await raw("delete from app.prospects where phone = '5541999998888' and created_by = $1", [platformUser]);
     const n = await as(P(), (q) => q<{ n: number }>("select public.platform_sheet_sync($1, $2::jsonb) as n", [sourceId, JSON.stringify(rows)]));
