@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { PERMISSION_KEYS, type Permission } from "@/shared/permissions";
-import { ACTIVITY_TYPES, PROSPECT_STATUS } from "@/shared/prospects";
+import { ACTIVITY_TYPES, normalizeInstagram, PROSPECT_STATUS } from "@/shared/prospects";
 import { FIELD_TYPES, NICHE_KEYS, SETUP_GROUPS } from "@/shared/niches";
 
 /**
@@ -182,6 +182,20 @@ export const prospectSchema = z.strictObject({
   email: z.email().max(320).nullable().optional().or(z.literal("").transform(() => null)),
   city: optionalText(120),
   niche: optionalText(120),
+  area: optionalText(120),
+  instagram: z
+    .string()
+    .max(200)
+    .nullable()
+    .optional()
+    .transform((v, ctx) => {
+      try {
+        return normalizeInstagram(v);
+      } catch {
+        ctx.addIssue({ code: "custom", message: "Instagram inválido (use @usuario ou o link do perfil)" });
+        return z.NEVER;
+      }
+    }),
   source: optionalText(120),
   status: z.enum(PROSPECT_STATUS).optional(),
   value_cents: z.coerce.number().int().min(0).max(1e13).optional(),

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseProspectList } from "@/shared/prospects";
+import { normalizeInstagram, parseProspectList } from "@/shared/prospects";
 import { prospectLogSchema, prospectSchema } from "@/server/validation";
 
 describe("importar lista de prospecção", () => {
@@ -29,5 +29,26 @@ describe("validação da prospecção", () => {
     expect(prospectSchema.safeParse({ name: "A", phone: "41 99999-8888" }).success).toBe(true);
     expect(prospectLogSchema.safeParse({ type: "sms" }).success).toBe(false);
     expect(prospectLogSchema.safeParse({ type: "whatsapp", body: "oi", status: "" }).success).toBe(true);
+  });
+});
+
+describe("Instagram da lead", () => {
+  it("aceita @, usuário ou link e devolve só o usuário", () => {
+    expect(normalizeInstagram("@dra.ana")).toBe("dra.ana");
+    expect(normalizeInstagram("https://instagram.com/escritorio_x?igsh=abc")).toBe("escritorio_x");
+    expect(normalizeInstagram("www.instagram.com/bia/")).toBe("bia");
+    expect(normalizeInstagram("  ")).toBeNull();
+    expect(() => normalizeInstagram("nome com espaço")).toThrow();
+    expect(() => normalizeInstagram("<script>")).toThrow();
+  });
+
+  it("lista colada traz área e Instagram (7 colunas)", () => {
+    const { rows } = parseProspectList("Dra. Ana; 41 99999-8888; Souza Adv; Curitiba; Advocacia; Trabalhista; @dra.ana");
+    expect(rows[0]).toMatchObject({ niche: "Advocacia", area: "Trabalhista", instagram: "dra.ana" });
+  });
+
+  it("validação recusa Instagram inválido", () => {
+    expect(prospectSchema.safeParse({ name: "A", instagram: "não vale" }).success).toBe(false);
+    expect(prospectSchema.safeParse({ name: "A", instagram: "@ok_123" }).data?.instagram).toBe("ok_123");
   });
 });

@@ -1,3 +1,5 @@
+import { normalizeInstagram } from "./prospects";
+
 /**
  * Google Sheets → Prospecção: leitura de uma planilha compartilhada por link.
  * Funções puras (testáveis): reconhecer o link, ler o CSV e converter as
@@ -56,7 +58,7 @@ export function parseCsv(text: string): string[][] {
 const norm = (s: string) =>
   s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 
-type Field = "name" | "phone" | "email" | "company" | "city" | "niche" | "source" | "notes";
+type Field = "name" | "phone" | "email" | "company" | "city" | "niche" | "area" | "instagram" | "source" | "notes";
 
 const HEADERS: Record<Field, string[]> = {
   name: ["nome", "name", "nome completo", "lead", "cliente", "contato", "responsavel", "advogado", "advogada"],
@@ -64,7 +66,9 @@ const HEADERS: Record<Field, string[]> = {
   email: ["email", "e mail", "mail"],
   company: ["empresa", "escritorio", "company", "razao social", "nome do escritorio", "negocio"],
   city: ["cidade", "city", "municipio", "cidade uf", "local"],
-  niche: ["nicho", "area", "area de atuacao", "segmento", "especialidade", "ramo"],
+  niche: ["nicho", "segmento", "ramo"],
+  area: ["area", "area de atuacao", "atuacao", "especialidade", "area do direito"],
+  instagram: ["instagram", "insta", "perfil instagram", "ig"],
   source: ["origem", "fonte", "source", "canal"],
   notes: ["observacoes", "observacao", "obs", "notas", "notes", "anotacoes", "comentarios"],
 };
@@ -84,6 +88,8 @@ export function mapHeader(header: string[]): Partial<Record<Field, number>> {
 export interface SheetLead {
   key: string;
   name: string;
+  area?: string;
+  instagram?: string;
   phone?: string;
   email?: string;
   company?: string;
@@ -91,6 +97,14 @@ export interface SheetLead {
   niche?: string;
   source?: string;
   notes?: string;
+}
+
+function instagramOf(v: string | undefined): string | undefined {
+  try {
+    return normalizeInstagram(v) ?? undefined;
+  } catch {
+    return undefined; // inválido: ignora o campo, a lead entra mesmo assim
+  }
 }
 
 function phoneOf(v: string): string | undefined {
@@ -143,6 +157,8 @@ export function sheetToLeads(csv: string): { leads: SheetLead[]; error?: string;
       ...(company ? { company } : {}),
       ...(get(r, "city", 120) ? { city: get(r, "city", 120) } : {}),
       ...(get(r, "niche", 120) ? { niche: get(r, "niche", 120) } : {}),
+      ...(get(r, "area", 120) ? { area: get(r, "area", 120) } : {}),
+      ...(instagramOf(get(r, "instagram", 200)) ? { instagram: instagramOf(get(r, "instagram", 200)) } : {}),
       ...(get(r, "source", 120) ? { source: get(r, "source", 120) } : {}),
       ...(get(r, "notes", 5000) ? { notes: get(r, "notes", 5000) } : {}),
     });
