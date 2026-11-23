@@ -28,8 +28,8 @@ describe("leitura da planilha", () => {
   });
 
   it("acha as colunas pelos títulos, com ou sem acento", () => {
-    expect(mapHeader(["Nome", "WhatsApp", "Escritório", "Área de atuação", "E-mail", "Observações"])).toEqual({
-      name: 0, phone: 1, company: 2, niche: 3, email: 4, notes: 5,
+    expect(mapHeader(["Nome", "WhatsApp", "Escritório", "Área de atuação", "E-mail", "Observações", "Nicho", "Instagram"])).toEqual({
+      name: 0, phone: 1, company: 2, area: 3, email: 4, notes: 5, niche: 6, instagram: 7,
     });
   });
 
@@ -55,5 +55,12 @@ describe("leitura da planilha", () => {
   it("explica quando falta a coluna Nome", () => {
     expect(sheetToLeads("Telefone\n11988887777").error).toMatch(/Nome/);
     expect(sheetToLeads("").error).toMatch(/vazia/);
+  });
+});
+
+describe("área e Instagram na planilha", () => {
+  it("lê a área de atuação e normaliza o Instagram", () => {
+    const { leads } = sheetToLeads("Nome,Área,Instagram\nDra. Ana,Trabalhista,https://www.instagram.com/dra.ana/\nDr. Bia,Família,@bia_adv\nDr. C,Cível,nao é valido!");
+    expect(leads.map((l) => [l.area, l.instagram])).toEqual([["Trabalhista", "dra.ana"], ["Família", "bia_adv"], ["Cível", undefined]]);
   });
 });

@@ -18,6 +18,8 @@ export interface Prospect {
   email: string | null;
   city: string | null;
   niche: string | null;
+  area: string | null;
+  instagram: string | null;
   source: string | null;
   status: string;
   value_cents: number;

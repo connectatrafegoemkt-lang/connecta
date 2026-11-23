@@ -23,7 +23,7 @@ import { localToIso, parseOrThrow, pick, reaisToCents, toActionError, type Actio
 import { idSchema, prospectLogSchema, prospectSchema } from "@/server/validation";
 import { parseProspectList } from "@/shared/prospects";
 
-const FIELDS = ["name", "company", "phone", "email", "city", "niche", "source", "status", "notes"];
+const FIELDS = ["name", "company", "phone", "email", "city", "niche", "area", "instagram", "source", "status", "notes"];
 
 /** Próximo follow-up: atalhos (amanhã, 3 dias...) às 9h de Brasília, ou data escolhida. */
 function followup(fd: FormData): string | null {

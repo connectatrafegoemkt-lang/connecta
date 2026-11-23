@@ -1,7 +1,10 @@
 import Link from "next/link";
-import { FileSpreadsheet, RefreshCw, Trash2, AlarmClock, CalendarClock, ChevronRight, ClipboardPaste, HandCoins, Plus, Search, Target, Trophy, UserPlus } from "lucide-react";
+import { AtSign, FileSpreadsheet, RefreshCw, Trash2, AlarmClock, CalendarClock, ChevronRight, ClipboardPaste, HandCoins, Plus, Search, Target, Trophy, UserPlus } from "lucide-react";
 import { getPlatformContext } from "@/server/platform";
-import { listProspects, listSheetSources, syncDueSheets } from "@/server/prospects";
+import { getProspect, listProspects, listSheetSources, syncDueSheets } from "@/server/prospects";
+import { idSchema } from "@/server/validation";
+import { instagramUrl } from "@/shared/prospects";
+import { ProspectDrawer } from "./prospect-drawer";
 import { ActionForm } from "@/components/action-form";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
@@ -30,7 +33,13 @@ export default async function ProspeccaoPage({ searchParams }: PageProps<"/plata
   // Planilhas do Google Sheets: lê as que não foram lidas nos últimos 5 min
   // (com tempo máximo, para a página não ficar presa se o Google demorar).
   await Promise.race([syncDueSheets(p).catch(() => 0), new Promise((r) => setTimeout(r, 8000))]);
-  const [all, sheets, wa] = await Promise.all([listProspects(p), listSheetSources(p), ownWhatsappInfo()]);
+  const leadId = typeof sp.lead === "string" && idSchema.safeParse(sp.lead).success ? sp.lead : null;
+  const [all, sheets, wa, opened] = await Promise.all([
+    listProspects(p),
+    listSheetSources(p),
+    ownWhatsappInfo(),
+    leadId ? getProspect(p, leadId).catch(() => null) : Promise.resolve(null),
+  ]);
 
   const now = nowMs();
   const eod = endOfTodaySP();
@@ -57,10 +66,11 @@ export default async function ProspeccaoPage({ searchParams }: PageProps<"/plata
   ];
   const counts = new Map<string, number>();
   for (const x of all) counts.set(x.status, (counts.get(x.status) ?? 0) + 1);
-  const href = (e: string | null) => {
+  const href = (e: string | null, lead?: string) => {
     const u = new URLSearchParams();
     if (e) u.set("etapa", e);
     if (q) u.set("q", q);
+    if (lead) u.set("lead", lead);
     const s = u.toString();
     return s ? `/plataforma/prospeccao?${s}` : "/plataforma/prospeccao";
   };
@@ -92,7 +102,9 @@ export default async function ProspeccaoPage({ searchParams }: PageProps<"/plata
             <input name="phone" placeholder="WhatsApp (55 41 99999-8888)" className="input" aria-label="WhatsApp" />
             <input name="email" type="email" placeholder="E-mail" className="input" aria-label="E-mail" />
             <input name="city" maxLength={120} placeholder="Cidade" className="input" aria-label="Cidade" />
-            <input name="niche" maxLength={120} placeholder="Nicho (ex.: Advocacia trabalhista)" className="input" aria-label="Nicho" />
+            <input name="niche" maxLength={120} placeholder="Nicho (ex.: Advocacia)" className="input" aria-label="Nicho" />
+            <input name="area" maxLength={120} placeholder="Área de atuação (ex.: Trabalhista)" className="input" aria-label="Área de atuação" />
+            <input name="instagram" maxLength={200} placeholder="Instagram (@usuario ou link)" className="input" aria-label="Instagram" />
             <input name="source" maxLength={120} placeholder="Onde achou (Instagram, Google…)" className="input" aria-label="Origem" />
             <input name="value" inputMode="decimal" placeholder="Valor estimado (R$/mês)" className="input" aria-label="Valor estimado" />
             <div className="sm:col-span-2">
@@ -105,7 +117,7 @@ export default async function ProspeccaoPage({ searchParams }: PageProps<"/plata
         <details className="card group">
           <summary className="section-title cursor-pointer list-none"><ClipboardPaste className="h-4 w-4 text-accent" /> Importar lista</summary>
           <p className="mt-2 text-sm text-muted">
-            Cole do Excel ou planilha, uma lead por linha: <span className="font-mono text-xs">nome; telefone; empresa; cidade; nicho</span>. Até 500 por vez.
+            Cole do Excel ou planilha, uma lead por linha: <span className="font-mono text-xs">nome; telefone; empresa; cidade; nicho; área; instagram</span>. Até 500 por vez.
           </p>
           <ActionForm action={importProspectsAction} resetOnSuccess className="mt-3 space-y-2" submitLabel="Importar" submitIcon={<ClipboardPaste className="h-4 w-4" />}>
             <textarea name="lista" required rows={6} placeholder={"Dra. Ana Souza; 41 99999-8888; Souza Advocacia; Curitiba; Trabalhista\nDr. João Lima; 11 98888-7777; Lima & Associados; São Paulo; Previdenciário"} className="input font-mono text-xs" aria-label="Lista de leads" />
@@ -152,7 +164,7 @@ export default async function ProspeccaoPage({ searchParams }: PageProps<"/plata
           <div className="rounded-xl bg-surface-2/60 p-3 text-xs text-muted">
             <p className="font-medium text-fg">Como preparar a planilha</p>
             <ol className="mt-1 list-decimal space-y-0.5 pl-4">
-              <li>Primeira linha com os títulos: <strong>Nome</strong> (obrigatório), Telefone ou WhatsApp, Empresa, Cidade, Nicho, E-mail, Origem, Observações.</li>
+              <li>Primeira linha com os títulos: <strong>Nome</strong> (obrigatório), Telefone ou WhatsApp, Empresa, Cidade, Nicho, Área de atuação, Instagram, E-mail, Origem, Observações.</li>
               <li>Em <strong>Compartilhar</strong>, deixe “Qualquer pessoa com o link” como <strong>Leitor</strong>. Atenção: quem tiver o link consegue ver a planilha.</li>
               <li>Cole o link aqui. Para outra aba, abra a aba e copie o link (ele inclui o <span className="font-mono">gid</span>).</li>
             </ol>
@@ -169,7 +181,7 @@ export default async function ProspeccaoPage({ searchParams }: PageProps<"/plata
               const late = new Date(x.next_followup_at!).getTime() < now - 3_600_000;
               return (
                 <li key={x.id} className="flex flex-wrap items-center gap-3 py-2.5 text-sm">
-                  <Link href={`/plataforma/prospeccao/${x.id}`} className="min-w-0 flex-1 hover:underline">
+                  <Link href={href(etapa, x.id)} scroll={false} className="min-w-0 flex-1 hover:underline">
                     <span className="font-medium">{x.name}</span>
                     {x.company && <span className="text-muted"> · {x.company}</span>}
                   </Link>
@@ -227,9 +239,9 @@ export default async function ProspeccaoPage({ searchParams }: PageProps<"/plata
                   return (
                     <tr key={x.id} className="hover:bg-surface-2/40">
                       <td className="px-5 py-3">
-                        <Link href={`/plataforma/prospeccao/${x.id}`} className="block font-medium hover:underline">{x.name}</Link>
+                        <Link href={href(etapa, x.id)} scroll={false} className="block font-medium hover:underline">{x.name}</Link>
                         <span className="block text-xs text-subtle">
-                          {[x.company, x.city, x.niche].filter(Boolean).join(" · ") || phoneFmt(x.phone)}
+                          {[x.company, x.area ?? x.niche, x.city].filter(Boolean).join(" · ") || phoneFmt(x.phone)}
                         </span>
                       </td>
                       <td className="px-5 py-3"><StatusBadge status={x.status} /></td>
@@ -245,7 +257,12 @@ export default async function ProspeccaoPage({ searchParams }: PageProps<"/plata
                         <span className="flex items-center justify-end gap-1">
                           <WhatsappDialog id={x.id} name={x.name} phone={x.phone} quickReplies={wa.quickReplies} connected={wa.connected} />
                           <ContactButtons phone={x.phone} name={x.name} />
-                          <Link href={`/plataforma/prospeccao/${x.id}`} className="icon-btn h-8 w-8" aria-label={`Abrir ${x.name}`}><ChevronRight className="h-4 w-4" /></Link>
+                          {x.instagram && (
+                            <a href={instagramUrl(x.instagram)} target="_blank" rel="noopener noreferrer" className="icon-btn h-8 w-8" title={`@${x.instagram}`} aria-label={`Instagram de ${x.name}`}>
+                              <AtSign className="h-4 w-4" />
+                            </a>
+                          )}
+                          <Link href={href(etapa, x.id)} scroll={false} className="icon-btn h-8 w-8" aria-label={`Abrir ${x.name}`}><ChevronRight className="h-4 w-4" /></Link>
                         </span>
                       </td>
                     </tr>
@@ -256,6 +273,7 @@ export default async function ProspeccaoPage({ searchParams }: PageProps<"/plata
           </div>
         )}
       </section>
+      {opened && <ProspectDrawer key={opened.id} prospect={opened} closeHref={href(etapa)} wa={wa} />}
     </div>
   );
 }
