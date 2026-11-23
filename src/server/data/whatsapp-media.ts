@@ -146,3 +146,39 @@ export async function deleteQuickReply(ctx: TenantContext, id: string) {
   if (error) throw fromDbError(error);
   if (!data?.length) throw notFound("Mensagem rápida não encontrada");
 }
+
+// ------------------------------------------------------- mensagens agendadas
+export interface ScheduledMessage {
+  id: string;
+  body: string;
+  scheduled_at: string;
+  media_kind: string | null;
+  media_filename: string | null;
+  session_id: string | null;
+  contact_id: string;
+  contact_name: string;
+  contact_phone: string | null;
+}
+
+/** Mensagens agendadas (ainda não enviadas) do tenant da sessão, da mais próxima à mais distante. */
+export async function listScheduledMessages(ctx: TenantContext, limit = 200): Promise<ScheduledMessage[]> {
+  const { data, error } = await ctx.db
+    .select("whatsapp_outbox", "id, body, scheduled_at, media_kind, media_filename, session_id, contact_id, contacts(name, phone)")
+    .eq("status", "pendente")
+    .not("scheduled_at", "is", null)
+    .order("scheduled_at", { ascending: true })
+    .limit(limit);
+  if (error) throw fromDbError(error);
+  return (data as unknown as (Omit<ScheduledMessage, "contact_name" | "contact_phone"> & { contacts: { name: string; phone: string | null } | null })[]).map(
+    ({ contacts, ...r }) => ({ ...r, contact_name: contacts?.name ?? "Contato", contact_phone: contacts?.phone ?? null }),
+  );
+}
+
+export async function countScheduledMessages(ctx: TenantContext): Promise<number> {
+  const { count, error } = await ctx.db
+    .select("whatsapp_outbox", "id", { count: "exact", head: true })
+    .eq("status", "pendente")
+    .not("scheduled_at", "is", null);
+  if (error) return 0;
+  return count ?? 0;
+}
