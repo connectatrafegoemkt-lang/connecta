@@ -47,6 +47,17 @@ describe("prospecção da CONNECTA", () => {
     expect(list.rows[0].l.some((x) => x.id === prospectId)).toBe(true);
   });
 
+  it("grava área de atuação e Instagram; recusa Instagram inválido", async () => {
+    const r = await as(P(), (q) =>
+      q<{ id: string }>("select public.platform_prospect_save(null, $1::jsonb) as id", [
+        JSON.stringify({ name: "Dra. Area", area: "Trabalhista", instagram: "dra.area" }),
+      ]),
+    );
+    const [row] = await raw<{ area: string; instagram: string }>("select area, instagram from app.prospects where id = $1", [r.rows[0].id]);
+    expect(row).toEqual({ area: "Trabalhista", instagram: "dra.area" });
+    await expectDbError(as(P(), (q) => q("select public.platform_prospect_save(null, $1::jsonb)", [JSON.stringify({ name: "X", instagram: "inválido com espaço" })])));
+  });
+
   it("importa uma lista e recusa telefone inválido", async () => {
     const n = await as(P(), (q) =>
       q<{ n: number }>("select public.platform_prospects_import($1::jsonb) as n", [
