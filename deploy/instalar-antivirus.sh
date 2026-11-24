@@ -17,16 +17,20 @@ if [ "$(id -u)" -ne 0 ]; then echo "Rode como root: sudo bash $(pwd)/deploy/inst
 
 echo "==> Instalando o ClamAV"
 export DEBIAN_FRONTEND=noninteractive
-apt-get update -q >/dev/null
-apt-get install -y -q clamav clamav-freshclam >/dev/null
+BIN_DIR="${BIN_DIR:-/usr/local/bin}"
+if ! command -v clamscan >/dev/null 2>&1 || ! command -v freshclam >/dev/null 2>&1; then
+  apt-get -o DPkg::Lock::Timeout=300 update -q >/dev/null
+  apt-get -o DPkg::Lock::Timeout=300 install -y -q clamav clamav-freshclam >/dev/null
+fi
 
 echo "==> Atualizando a base de vírus (primeira vez demora um pouco)"
 systemctl stop clamav-freshclam >/dev/null 2>&1 || true
-freshclam --quiet || echo "    aviso: a base não atualizou agora; o serviço tenta de novo sozinho"
+timeout 900 freshclam --quiet || echo "    aviso: a base não atualizou agora; o serviço tenta de novo sozinho"
 systemctl enable --now clamav-freshclam >/dev/null
 
 echo "==> Instalando o comando connecta-antivirus e a varredura diária"
-install -m 755 deploy/antivirus.sh /usr/local/bin/connecta-antivirus
+install -m 755 deploy/antivirus.sh "$BIN_DIR/connecta-antivirus.novo"
+mv -f "$BIN_DIR/connecta-antivirus.novo" "$BIN_DIR/connecta-antivirus"
 
 cat > /etc/systemd/system/connecta-antivirus.service <<'UNIT'
 [Unit]
