@@ -135,6 +135,15 @@ migração falhar, o código volta sozinho e o sistema continua no ar.
 as cópias. Se o repositório for privado, o token é pedido no terminal (sem
 aparecer) e fica só em `/root/.config/connecta-atualizar/github-token`.
 
+### Antivírus do servidor
+
+Instale uma vez: `sudo bash /opt/connecta/deploy/instalar-antivirus.sh`.
+Instala o ClamAV (base de vírus atualizada sozinha) e agenda uma varredura do
+servidor toda madrugada (~03:30), com prioridade baixa. Ele só avisa: não apaga
+nem move arquivos. Resultado: `connecta-antivirus`; varrer na hora:
+`sudo connecta-antivirus --varrer`. Se achar algo, aparece um aviso ao entrar
+por SSH.
+
 > Aviso: a integração usa o protocolo do WhatsApp Web (biblioteca não
 > oficial). Para alto volume, avalie a API oficial do WhatsApp Business.
 
