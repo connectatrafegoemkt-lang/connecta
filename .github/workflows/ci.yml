@@ -60,6 +60,8 @@ jobs:
         run: sudo bash tests/deploy/atualizar.test.sh
       - name: Antivírus do servidor (deploy/antivirus.sh)
         run: sudo bash tests/deploy/antivirus.test.sh
+      - name: Ferramentas do servidor no deploy (deploy/ferramentas-servidor.sh)
+        run: bash tests/deploy/ferramentas-servidor.test.sh
       - name: Atualização automática do banco (deploy/migrar-banco.sh)
         run: bash tests/deploy/migrar-banco.test.sh
         env:

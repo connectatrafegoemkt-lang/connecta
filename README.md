@@ -137,7 +137,9 @@ aparecer) e fica só em `/root/.config/connecta-atualizar/github-token`.
 
 ### Antivírus do servidor
 
-Instale uma vez: `sudo bash /opt/connecta/deploy/instalar-antivirus.sh`.
+Instalado sozinho pelo deploy automático (`deploy/ferramentas-servidor.sh`,
+que também instala o `connecta-atualizar`); à mão:
+`sudo bash /opt/connecta/deploy/instalar-antivirus.sh`.
 Instala o ClamAV (base de vírus atualizada sozinha) e agenda uma varredura do
 servidor toda madrugada (~03:30), com prioridade baixa. Ele só avisa: não apaga
 nem move arquivos. Resultado: `connecta-antivirus`; varrer na hora:
