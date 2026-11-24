@@ -96,7 +96,7 @@ fi
 echo "==> 4/5 Construindo e subindo (app + worker + HTTPS). Pode levar alguns minutos..."
 docker compose up -d --build
 # limpa só imagens antigas DESTE sistema (não mexe em outros do servidor)
-PROJ=$(grep -E '^COMPOSE_PROJECT_NAME=' .env | cut -d= -f2-); PROJ=${PROJ:-$(basename "$(pwd)" | tr '[:upper:]' '[:lower:]')}
+PROJ=$(grep -E '^COMPOSE_PROJECT_NAME=' .env | cut -d= -f2- || true); PROJ=${PROJ:-$(basename "$(pwd)" | tr '[:upper:]' '[:lower:]')}
 docker image prune -f --filter "label=com.docker.compose.project=$PROJ" >/dev/null || true
 
 echo "==> Ferramentas do servidor (comando de atualização e antivírus)"
