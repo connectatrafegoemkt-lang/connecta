@@ -112,6 +112,15 @@ SUPABASE_URL=... SUPABASE_ANON_KEY=... SUPABASE_SERVICE_ROLE_KEY=... APP_URL=htt
 Guia completo para VPS Hostinger + Supabase: [docs/DEPLOY-HOSTINGER.md](./docs/DEPLOY-HOSTINGER.md).
 Resumo: `git clone` na VPS e `bash deploy/instalar.sh` (sobe app + worker + HTTPS com Docker).
 
+### Antivírus do servidor
+
+Instale uma vez: `sudo bash /opt/connecta/deploy/instalar-antivirus.sh`.
+Instala o ClamAV (base de vírus atualizada sozinha) e agenda uma varredura do
+servidor toda madrugada (~03:30), com prioridade baixa. Ele só avisa: não apaga
+nem move arquivos. Resultado: `connecta-antivirus`; varrer na hora:
+`sudo connecta-antivirus --varrer`. Se achar algo, aparece um aviso ao entrar
+por SSH.
+
 > Aviso: a integração usa o protocolo do WhatsApp Web (biblioteca não
 > oficial). Para alto volume, avalie a API oficial do WhatsApp Business.
 
