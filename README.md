@@ -112,6 +112,29 @@ SUPABASE_URL=... SUPABASE_ANON_KEY=... SUPABASE_SERVICE_ROLE_KEY=... APP_URL=htt
 Guia completo para VPS Hostinger + Supabase: [docs/DEPLOY-HOSTINGER.md](./docs/DEPLOY-HOSTINGER.md).
 Resumo: `git clone` na VPS e `bash deploy/instalar.sh` (sobe app + worker + HTTPS com Docker).
 
+### Atualizar o sistema (um comando só)
+
+Instale uma vez (e de novo só quando `deploy/atualizar.sh` mudar):
+
+```bash
+sudo bash /opt/connecta/deploy/instalar-atualizador.sh
+```
+
+Depois, para atualizar sempre:
+
+```bash
+connecta-atualizar
+```
+
+Ele guarda uma cópia (versão do código, `.env`, imagens Docker e um dump
+do banco em `/opt/connecta-backups`, últimas 5), baixa a `main`, instala
+dependências, aplica as migrações, reinicia só os containers do CONNECTA e
+confere se o site respondeu ("Atualizado." ou o erro). Se o build ou a
+migração falhar, o código volta sozinho e o sistema continua no ar.
+`connecta-atualizar --voltar` volta para a cópia anterior; `--copias` lista
+as cópias. Se o repositório for privado, o token é pedido no terminal (sem
+aparecer) e fica só em `/root/.config/connecta-atualizar/github-token`.
+
 ### Antivírus do servidor
 
 Instale uma vez: `sudo bash /opt/connecta/deploy/instalar-antivirus.sh`.
