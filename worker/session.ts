@@ -19,6 +19,8 @@ import { AiResponder } from "./ai-responder";
 import { adSourceLabel, extractAdReferral } from "./ad-referral";
 import { onLabelEdit, processLabelQueue } from "./labels";
 import { currentWaVersion, disconnectMessage } from "./wa-version";
+import { reconnectPolicy } from "./reconnect";
+import { JidResolver } from "./resolve-jid";
 
 /**
  * Uma conexão WhatsApp de UM tenant. Cada instância tem seu próprio socket,
@@ -31,6 +33,7 @@ export class TenantSession {
   private retries = 0;
   connected = false;
   private readonly ai: AiResponder;
+  private jids: JidResolver | null = null;
 
   constructor(
     readonly repo: WorkerTenantRepo,
@@ -70,9 +73,13 @@ export class TenantSession {
     // Não apaga o último erro aqui: ele continua visível até conectar ou gerar o QR.
     await this.repo.setSession({ status: "conectando" });
 
+    // Salva em fila (uma gravação por vez): gravações fora de ordem podiam
+    // deixar credenciais antigas no banco e derrubar a sessão no reinício.
+    let saving: Promise<unknown> = Promise.resolve();
     sock.ev.on("creds.update", () => {
-      saveCreds().catch((e) => this.log.error({ err: e }, "falha ao salvar credenciais"));
+      saving = saving.then(saveCreds).catch((e) => this.log.error({ err: e }, "falha ao salvar credenciais"));
     });
+    this.jids = new JidResolver((...n) => sock.onWhatsApp(...n));
 
     sock.ev.on("connection.update", async (u) => {
       try {
@@ -119,14 +126,19 @@ export class TenantSession {
             this.retries += 1;
             if (!reachedQrOrOpen) this.failuresBeforeQr += 1;
             this.log.warn({ code, retries: this.retries, failuresBeforeQr: this.failuresBeforeQr }, "conexão do WhatsApp caiu");
-            // Pareamento travado (nunca chegou ao QR) ou sessão corrompida:
-            // apaga as credenciais incompletas e recomeça do zero (novo QR).
-            if (code === 500 || (!state.creds.registered && this.failuresBeforeQr >= 3)) {
+            // Só apaga o login se o pareamento ainda não terminou (travado).
+            // Número já conectado NUNCA perde o login por uma queda comum.
+            const { wipeAuth, waitMs: wait } = reconnectPolicy({
+              code,
+              registered: Boolean(state.creds.registered),
+              failuresBeforeQr: this.failuresBeforeQr,
+              retries: this.retries,
+            });
+            if (wipeAuth) {
               this.failuresBeforeQr = 0;
               await this.repo.clearAuth().catch(() => undefined);
               this.log.warn("pareamento reiniciado (credenciais incompletas apagadas)");
             }
-            const wait = code === 515 ? 1000 : Math.min(30_000, 1000 * 2 ** Math.min(this.retries, 5));
             await this.repo.setSession({ status: "conectando", last_error: disconnectMessage(code) });
             setTimeout(() => {
               if (!this.stopped) this.start().catch((e) => this.log.error({ err: e }, "falha ao reconectar"));
@@ -296,7 +308,12 @@ export class TenantSession {
     const items = await this.repo.claimOutbox();
     for (const item of items) {
       try {
-        const sent = await this.sock.sendMessage(phoneToJid(item.phone), (await this.contentFor(item)) as never);
+        const jid = this.jids ? await this.jids.resolve(item.phone) : phoneToJid(item.phone);
+        if (!jid) {
+          await this.repo.finishOutbox(item.id, "erro", { error: "Este número não tem WhatsApp." });
+          continue;
+        }
+        const sent = await this.sock.sendMessage(jid, (await this.contentFor(item)) as never);
         const externalId = sent?.key.id;
         if (!externalId) throw new Error("sem id de mensagem");
         const inter = await this.repo.insertInteraction({
