@@ -40,9 +40,9 @@ export function disconnectMessage(code: number | undefined): string {
     case 403:
       return "O WhatsApp bloqueou este acesso (o número pode estar restrito).";
     case 440:
-      return "Este número foi conectado em outro lugar. Gere um novo QR code para voltar.";
+      return "Outra conexão assumiu este número. Tentando reconectar em 1 minuto…";
     case 500:
-      return "Sessão do WhatsApp corrompida. Recomeçando o pareamento…";
+      return "A conexão com o WhatsApp oscilou. Reconectando…";
     case 515:
       return "O WhatsApp pediu para reiniciar a conexão. Reconectando…";
     default:
