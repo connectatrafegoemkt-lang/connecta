@@ -43,7 +43,8 @@ import {
   renameWhatsappNumber,
   requestWhatsapp,
 } from "@/server/data/whatsapp";
-import { cancelScheduled, createQuickReply, deleteQuickReply, queueTextMessage } from "@/server/data/whatsapp-media";
+import { cancelScheduled, createQuickReply, deleteQuickReply, queueTextMessage, resolveSchedule } from "@/server/data/whatsapp-media";
+import { brDateTime } from "@/shared/schedule";
 import { saveAiSettings, setContactAi, setSuggestionStatus, testAiReply } from "@/server/data/ai";
 
 /*
@@ -353,11 +354,11 @@ export async function whatsappSendAction(_: ActionState, fd: FormData): Promise<
   try {
     const ctx = await getTenantContext();
     const { contact_id, body, session_id } = parseOrThrow(whatsappSendSchema, pick(fd, ["contact_id", "body", "session_id"]));
-    const scheduled = localToIso(fd.get("scheduled_at"));
+    const scheduled = await resolveSchedule(ctx, { scheduledAt: localToIso(fd.get("scheduled_at")), interval: fd.get("intervalo") });
     if (scheduled) await queueTextMessage(ctx, contact_id, body, scheduled, session_id);
     else await queueWhatsappMessage(ctx, contact_id, body, session_id);
     revalidatePath("/whatsapp");
-    return { ok: true, message: scheduled ? "Mensagem agendada." : null };
+    return { ok: true, message: scheduled ? `Mensagem agendada para ${brDateTime(scheduled)}.` : null };
   } catch (e) {
     return toActionError(e);
   }

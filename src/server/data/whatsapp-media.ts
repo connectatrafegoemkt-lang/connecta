@@ -3,6 +3,7 @@ import type { TenantContext } from "../context";
 import { badRequest, fromDbError, notFound } from "../errors";
 import { extFromMime, safeName } from "@/shared/media-names";
 import { pickSendingNumber } from "./whatsapp";
+import { INTERVAL_MAX, INTERVAL_MIN, parseInterval, sequenceSlot } from "@/shared/schedule";
 
 export type MediaKind = "audio" | "image" | "video" | "document";
 export const MAX_UPLOAD_BYTES = 20 * 1024 * 1024;
@@ -172,6 +173,31 @@ export async function listScheduledMessages(ctx: TenantContext, limit = 200): Pr
   return (data as unknown as (Omit<ScheduledMessage, "contact_name" | "contact_phone"> & { contacts: { name: string; phone: string | null } | null })[]).map(
     ({ contacts, ...r }) => ({ ...r, contact_name: contacts?.name ?? "Contato", contact_phone: contacts?.phone ?? null }),
   );
+}
+
+/**
+ * Horário do agendamento a partir do formulário: data/hora escolhida, ou
+ * "em sequência" (intervalo em minutos depois da última mensagem agendada
+ * do cliente). Devolve null para envio imediato.
+ */
+export async function resolveSchedule(
+  ctx: TenantContext,
+  input: { scheduledAt: string | null; interval: unknown },
+): Promise<string | null> {
+  if (input.interval !== null && input.interval !== undefined && input.interval !== "") {
+    const minutes = parseInterval(input.interval);
+    if (!minutes) throw badRequest(`Intervalo inválido (de ${INTERVAL_MIN} a ${INTERVAL_MAX} minutos)`);
+    const { data, error } = await ctx.db
+      .select("whatsapp_outbox", "scheduled_at")
+      .eq("status", "pendente")
+      .not("scheduled_at", "is", null)
+      .order("scheduled_at", { ascending: false })
+      .limit(1);
+    if (error) throw fromDbError(error);
+    const last = (data as unknown as { scheduled_at: string | null }[] | null)?.[0]?.scheduled_at ?? null;
+    return sequenceSlot(last, minutes);
+  }
+  return input.scheduledAt;
 }
 
 export async function countScheduledMessages(ctx: TenantContext): Promise<number> {
