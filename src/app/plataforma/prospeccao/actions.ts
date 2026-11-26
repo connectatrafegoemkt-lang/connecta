@@ -7,7 +7,7 @@ import { getTenantContext } from "@/server/context";
 import { HttpError } from "@/server/errors";
 import { findOrCreateContactByPhone } from "@/server/data/contacts";
 import { queueWhatsappMessage } from "@/server/data/whatsapp";
-import { queueTextMessage } from "@/server/data/whatsapp-media";
+import { queueMediaMessage, queueTextMessage, resolveSchedule } from "@/server/data/whatsapp-media";
 import {
   addSheetSource,
   deleteProspect,
@@ -194,9 +194,11 @@ export async function sendProspectWhatsappAction(_: ActionState, fd: FormData): 
     const body = String(fd.get("body") ?? "").trim();
     if (!body) return { ok: false, error: "Escreva a mensagem." };
     if (body.length > 4096) return { ok: false, error: "Mensagem longa demais (máximo 4096 caracteres)." };
-    const scheduled = fd.get("modo") === "agendar" ? localToIso(fd.get("scheduled_at")) : null;
-    if (fd.get("modo") === "agendar" && !scheduled) return { ok: false, error: "Escolha a data e a hora do agendamento." };
+    const modo = fd.get("modo");
+    const picked = modo === "agendar" ? localToIso(fd.get("scheduled_at")) : null;
+    if (modo === "agendar" && !picked) return { ok: false, error: "Escolha a data e a hora do agendamento." };
     const { p, ctx, x, contactId } = await ownContactFor(id);
+    const scheduled = await resolveSchedule(ctx, { scheduledAt: picked, interval: modo === "sequencia" ? fd.get("intervalo") : null });
     if (scheduled) await queueTextMessage(ctx, contactId, body, scheduled);
     else await queueWhatsappMessage(ctx, contactId, body);
     await logProspectContact(p, id, {
@@ -208,6 +210,33 @@ export async function sendProspectWhatsappAction(_: ActionState, fd: FormData): 
     revalidatePath(`/plataforma/prospeccao/${id}`);
     revalidatePath("/whatsapp");
     return { ok: true, message: scheduled ? `Mensagem agendada para ${brTime(scheduled)}.` : "Mensagem enviada para a fila do WhatsApp." };
+  } catch (e) {
+    return toActionError(e);
+  }
+}
+
+/** Áudio gravado na janela de WhatsApp da Prospecção: envia agora ou agenda. */
+export async function sendProspectAudioAction(_: ActionState, fd: FormData): Promise<ActionState> {
+  try {
+    const id = parseOrThrow(idSchema, fd.get("id"));
+    const file = fd.get("audio");
+    if (!(file instanceof File) || file.size === 0) return { ok: false, error: "Grave o áudio antes de enviar." };
+    if (!file.type.startsWith("audio/")) return { ok: false, error: "Arquivo de áudio inválido." };
+    const modo = fd.get("modo");
+    const picked = modo === "agendar" ? localToIso(fd.get("scheduled_at")) : null;
+    if (modo === "agendar" && !picked) return { ok: false, error: "Escolha a data e a hora do agendamento." };
+    const { p, ctx, x, contactId } = await ownContactFor(id);
+    const scheduled = await resolveSchedule(ctx, { scheduledAt: picked, interval: modo === "sequencia" ? fd.get("intervalo") : null });
+    await queueMediaMessage(ctx, { contactId, file, caption: "", scheduledAt: scheduled, asVoice: true });
+    await logProspectContact(p, id, {
+      type: scheduled ? "nota" : "whatsapp",
+      body: scheduled ? `Áudio de WhatsApp agendado para ${brTime(scheduled)}.` : "[áudio enviado pelo WhatsApp]",
+      next_followup_at: x.next_followup_at,
+    });
+    revalidatePath("/plataforma/prospeccao");
+    revalidatePath(`/plataforma/prospeccao/${id}`);
+    revalidatePath("/whatsapp");
+    return { ok: true, message: scheduled ? `Áudio agendado para ${brTime(scheduled)}.` : "Áudio enviado para a fila do WhatsApp." };
   } catch (e) {
     return toActionError(e);
   }

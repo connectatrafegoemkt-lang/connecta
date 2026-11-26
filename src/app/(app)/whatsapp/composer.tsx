@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { AlarmClock, Loader2, Mic, Paperclip, Send, Square, Trash2, TriangleAlert, X, Zap } from "lucide-react";
+import { AlarmClock, ListOrdered, Loader2, Mic, Paperclip, Send, Square, Trash2, TriangleAlert, X, Zap } from "lucide-react";
+import { brDateTime, INTERVAL_PRESETS } from "@/shared/schedule";
 import { whatsappSendAction } from "../actions";
 
 export interface QuickReplyItem {
@@ -51,6 +52,9 @@ export function Composer({
   const [file, setFile] = useState<File | null>(null);
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [scheduledAt, setScheduledAt] = useState("");
+  // "em sequência": X minutos depois da última mensagem agendada
+  const [sequence, setSequence] = useState(false);
+  const [interval, setIntervalMin] = useState("10");
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [pending, start] = useTransition();
@@ -76,8 +80,9 @@ export function Composer({
   const slash = text.startsWith("/") ? text.slice(1).toLowerCase() : null;
   const matches = slash === null ? [] : quickReplies.filter((q) => q.shortcut.startsWith(slash) || q.title.toLowerCase().includes(slash)).slice(0, 6);
 
-  const scheduledIso = scheduleOpen && scheduledAt ? scheduledAt : "";
-  const canSchedule = !!scheduledIso;
+  const scheduledIso = scheduleOpen && !sequence && scheduledAt ? scheduledAt : "";
+  const inSequence = scheduleOpen && sequence;
+  const canSchedule = !!scheduledIso || inSequence;
   const disabledReason = !connected && !canSchedule ? "WhatsApp desconectado: só é possível agendar." : null;
 
   async function startRecording() {
@@ -117,6 +122,7 @@ export function Composer({
     setAudioSrc(null);
     setScheduleOpen(false);
     setScheduledAt("");
+    setSequence(false);
     if (fileInput.current) fileInput.current.value = "";
   }
 
@@ -133,25 +139,26 @@ export function Composer({
         if (numbers.length > 1 && sessionId) fd.set("session_id", sessionId);
         fd.set("caption", audio ? "" : body);
         if (scheduledIso) fd.set("scheduled_at", new Date(scheduledIso).toISOString());
+        if (inSequence) fd.set("intervalo", interval);
         if (audio) {
           fd.set("voice", "1");
           fd.set("file", new File([audio], "audio.webm", { type: audio.type || "audio/webm" }));
         } else if (file) fd.set("file", file);
         const res = await fetch("/api/whatsapp/media", { method: "POST", body: fd });
-        if (!res.ok) {
-          const j = await res.json().catch(() => ({}));
-          return setError(j.error ?? "Falha ao enviar");
-        }
+        const j = await res.json().catch(() => ({}));
+        if (!res.ok) return setError(j.error ?? "Falha ao enviar");
+        setNotice(j.scheduled_at ? `Agendada para ${brDateTime(j.scheduled_at)}.` : null);
       } else {
         const fd = new FormData();
         fd.set("contact_id", contactId);
         if (numbers.length > 1 && sessionId) fd.set("session_id", sessionId);
         fd.set("body", body);
         if (scheduledIso) fd.set("scheduled_at", scheduledIso);
+        if (inSequence) fd.set("intervalo", interval);
         const r = await whatsappSendAction({}, fd);
         if (r.error) return setError(r.error);
+        setNotice(r.message ?? null);
       }
-      setNotice(scheduledIso ? "Mensagem agendada." : null);
       reset();
       router.refresh();
     });
@@ -209,9 +216,21 @@ export function Composer({
       {scheduleOpen && (
         <div className="mb-2 flex flex-wrap items-center gap-2 rounded-xl border border-brand-500/40 bg-accent-soft px-3 py-2 text-sm">
           <AlarmClock className="h-4 w-4 text-accent" />
-          <span className="font-medium">Agendar para</span>
-          <input type="datetime-local" className="input w-auto py-1.5" value={scheduledAt} onChange={(e) => setScheduledAt(e.target.value)} />
-          <button type="button" className="icon-btn ml-auto" aria-label="Cancelar agendamento" onClick={() => { setScheduleOpen(false); setScheduledAt(""); }}><X className="h-4 w-4" /></button>
+          <button type="button" aria-pressed={!sequence} onClick={() => setSequence(false)} className={`chip ${!sequence ? "border-brand-500 bg-brand-500/10 text-accent-strong" : ""}`}>Data e hora</button>
+          <button type="button" aria-pressed={sequence} onClick={() => setSequence(true)} className={`chip gap-1 ${sequence ? "border-brand-500 bg-brand-500/10 text-accent-strong" : ""}`}><ListOrdered className="h-3.5 w-3.5" /> Em sequência</button>
+          {sequence ? (
+            <>
+              <select value={interval} onChange={(e) => setIntervalMin(e.target.value)} className="input w-auto py-1.5" aria-label="Intervalo entre mensagens">
+                {INTERVAL_PRESETS.map((n) => <option key={n} value={n}>{n} min</option>)}
+                <option value="45">45 min</option>
+                <option value="60">1 hora</option>
+              </select>
+              <span className="text-xs text-muted">depois da última agendada</span>
+            </>
+          ) : (
+            <input type="datetime-local" className="input w-auto py-1.5" value={scheduledAt} onChange={(e) => setScheduledAt(e.target.value)} />
+          )}
+          <button type="button" className="icon-btn ml-auto" aria-label="Cancelar agendamento" onClick={() => { setScheduleOpen(false); setScheduledAt(""); setSequence(false); }}><X className="h-4 w-4" /></button>
         </div>
       )}
 
