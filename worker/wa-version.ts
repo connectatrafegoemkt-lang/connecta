@@ -38,7 +38,7 @@ export function disconnectMessage(code: number | undefined): string {
     case 408:
       return "O WhatsApp não respondeu a tempo. Tentando de novo…";
     case 403:
-      return "O WhatsApp bloqueou este acesso (o número pode estar restrito).";
+      return "O WhatsApp bloqueou ou restringiu este número. Verifique o aplicativo no celular.";
     case 440:
       return "Outra conexão assumiu este número. Tentando reconectar em 1 minuto…";
     case 500:

@@ -17,5 +17,7 @@ export function reconnectPolicy(o: { code: number | undefined; registered: boole
   if (o.code === DisconnectReason.restartRequired) waitMs = 1000;
   // Outra conexão com o mesmo login assumiu: espera mais para não "brigar" com ela.
   if (o.code === DisconnectReason.connectionReplaced) waitMs = 60_000;
+  // Número bloqueado/restrito: tenta de novo devagar (a cada 5 min).
+  if (o.code === DisconnectReason.forbidden) waitMs = 300_000;
   return { wipeAuth: pairingStuck, waitMs };
 }

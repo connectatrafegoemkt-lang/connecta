@@ -19,6 +19,7 @@ describe("reconnectPolicy", () => {
   it("espera: 515 rápido, 440 longo, demais com limite de 30s", () => {
     expect(reconnectPolicy({ code: 515, registered: true, failuresBeforeQr: 0, retries: 4 }).waitMs).toBe(1000);
     expect(reconnectPolicy({ code: 440, registered: true, failuresBeforeQr: 0, retries: 1 }).waitMs).toBe(60_000);
+    expect(reconnectPolicy({ code: 403, registered: true, failuresBeforeQr: 0, retries: 1 }).waitMs).toBe(300_000);
     expect(reconnectPolicy({ code: 428, registered: true, failuresBeforeQr: 0, retries: 1 }).waitMs).toBe(2000);
     expect(reconnectPolicy({ code: 428, registered: true, failuresBeforeQr: 0, retries: 20 }).waitMs).toBe(30_000);
   });

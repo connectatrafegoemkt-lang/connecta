@@ -213,4 +213,23 @@ describe.skipIf(!enabled)("isolamento do WhatsApp (Supabase real)", () => {
     const { data } = await admin.from("whatsapp_outbox").select("tenant_id").eq("body", "olá").eq("contact_id", A.contactId);
     expect(data!.every((r) => r.tenant_id === A.tenantId)).toBe(true);
   });
+
+  it.runIf(Boolean(APP))("API /api/avisos: A só vê os números e as mensagens recebidas de A", async () => {
+    await admin.from("interactions").insert([
+      { tenant_id: A.tenantId, contact_id: A.contactId, type: "whatsapp", direction: "entrada", body: `aviso-A-${run}` },
+      { tenant_id: B.tenantId, contact_id: B.contactId, type: "whatsapp", direction: "entrada", body: `aviso-B-${run}` },
+    ]).throwOnError();
+    await admin.from("whatsapp_sessions").update({ status: "erro", last_error: `bloqueado-B-${run}` }).eq("tenant_id", B.tenantId);
+    const r = await fetch(`${APP}/api/avisos`, { headers: { Authorization: `Bearer ${A.token}` } });
+    expect(r.status).toBe(200);
+    const body = await r.json();
+    expect(body.numbers.map((n: { id: string }) => n.id)).toEqual([A.sessionId]);
+    expect(JSON.stringify(body)).not.toContain(`bloqueado-B-${run}`);
+    expect(JSON.stringify(body)).not.toContain(`aviso-B-${run}`);
+    expect(body.lastInbound?.contact_id).toBe(A.contactId);
+    // tenant_id vindo do front é recusado
+    const forged = await fetch(`${APP}/api/avisos?tenant_id=${B.tenantId}`, { headers: { Authorization: `Bearer ${A.token}` } });
+    expect(forged.status).toBe(400);
+    await admin.from("whatsapp_sessions").update({ status: "conectado", last_error: null }).eq("tenant_id", B.tenantId);
+  });
 });

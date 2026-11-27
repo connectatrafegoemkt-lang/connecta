@@ -118,7 +118,12 @@ export class TenantSession {
             // Desconectado pelo celular: apaga credenciais e para.
             await this.repo.clearAuth();
             await this.repo.setQr(null);
-            await this.repo.setSession({ status: "desconectado", desired_state: "desconectado", phone: null });
+            await this.repo.setSession({
+              status: "desconectado",
+              desired_state: "desconectado",
+              phone: null,
+              last_error: "O WhatsApp desconectou este aparelho (saiu pelo celular ou o WhatsApp encerrou a sessão). Conecte de novo pelo QR code.",
+            });
             this.stopped = true;
             return;
           }
@@ -139,7 +144,8 @@ export class TenantSession {
               await this.repo.clearAuth().catch(() => undefined);
               this.log.warn("pareamento reiniciado (credenciais incompletas apagadas)");
             }
-            await this.repo.setSession({ status: "conectando", last_error: disconnectMessage(code) });
+            // 403 = número bloqueado/restrito pelo WhatsApp: fica como "erro" (aviso no CRM)
+            await this.repo.setSession({ status: code === 403 ? "erro" : "conectando", last_error: disconnectMessage(code) });
             setTimeout(() => {
               if (!this.stopped) this.start().catch((e) => this.log.error({ err: e }, "falha ao reconectar"));
             }, wait);
