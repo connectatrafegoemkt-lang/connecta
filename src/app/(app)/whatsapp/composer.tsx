@@ -217,10 +217,10 @@ export function Composer({
         <div className="mb-2 flex flex-wrap items-center gap-2 rounded-xl border border-brand-500/40 bg-accent-soft px-3 py-2 text-sm">
           <AlarmClock className="h-4 w-4 text-accent" />
           <button type="button" aria-pressed={!sequence} onClick={() => setSequence(false)} className={`chip ${!sequence ? "border-brand-500 bg-brand-500/10 text-accent-strong" : ""}`}>Data e hora</button>
-          <button type="button" aria-pressed={sequence} onClick={() => setSequence(true)} className={`chip gap-1 ${sequence ? "border-brand-500 bg-brand-500/10 text-accent-strong" : ""}`}><ListOrdered className="h-3.5 w-3.5" /> Em sequência</button>
+          <button type="button" aria-pressed={sequence} onClick={() => setSequence(true)} className={`chip gap-1 ${sequence ? "border-brand-500 bg-brand-500/10 text-accent-strong" : ""}`}><ListOrdered className="h-3.5 w-3.5" /> Rodízio</button>
           {sequence ? (
             <>
-              <select value={interval} onChange={(e) => setIntervalMin(e.target.value)} className="input w-auto py-1.5" aria-label="Intervalo entre mensagens">
+              <select value={interval} onChange={(e) => setIntervalMin(e.target.value)} className="input w-auto py-1.5" aria-label="Intervalo do rodízio">
                 {INTERVAL_PRESETS.map((n) => <option key={n} value={n}>{n} min</option>)}
                 <option value="45">45 min</option>
                 <option value="60">1 hora</option>
@@ -247,8 +247,33 @@ export function Composer({
           <button type="button" className="icon-btn h-10 w-10" title="Anexar arquivo" aria-label="Anexar arquivo" onClick={() => fileInput.current?.click()} disabled={!!audio}>
             <Paperclip className="h-5 w-5" />
           </button>
-          <button type="button" className={`icon-btn h-10 w-10 ${scheduleOpen ? "text-[var(--wa-green)]" : ""}`} title="Agendar" aria-label="Agendar mensagem" onClick={() => setScheduleOpen((v) => !v)}>
+          <button
+            type="button"
+            className={`icon-btn h-10 w-10 ${scheduleOpen && !sequence ? "text-[var(--wa-green)]" : ""}`}
+            title="Agendar mensagem (data e hora)"
+            aria-label="Agendar mensagem"
+            aria-pressed={scheduleOpen && !sequence}
+            onClick={() => {
+              const on = !(scheduleOpen && !sequence);
+              setScheduleOpen(on);
+              setSequence(false);
+            }}
+          >
             <AlarmClock className="h-5 w-5" />
+          </button>
+          <button
+            type="button"
+            className={`icon-btn h-10 w-10 ${scheduleOpen && sequence ? "text-[var(--wa-green)]" : ""}`}
+            title="Rodízio: X minutos depois da última mensagem agendada"
+            aria-label="Rodízio"
+            aria-pressed={scheduleOpen && sequence}
+            onClick={() => {
+              const on = !(scheduleOpen && sequence);
+              setScheduleOpen(on);
+              setSequence(on);
+            }}
+          >
+            <ListOrdered className="h-5 w-5" />
           </button>
           <textarea
             ref={inputRef}

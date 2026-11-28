@@ -9,7 +9,7 @@ type Modo = "agora" | "agendar" | "sequencia";
 const MODOS: { id: Modo; label: string; icon: typeof Send }[] = [
   { id: "agora", label: "Enviar agora", icon: Send },
   { id: "agendar", label: "Agendar", icon: CalendarClock },
-  { id: "sequencia", label: "Em sequência", icon: ListOrdered },
+  { id: "sequencia", label: "Rodízio", icon: ListOrdered },
 ];
 
 export interface QuickReplyOpt {

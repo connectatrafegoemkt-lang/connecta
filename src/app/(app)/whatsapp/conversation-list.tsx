@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Check, CheckCheck, Inbox, Search, Smartphone } from "lucide-react";
 import { Avatar } from "@/components/avatar";
 import { listTime } from "@/components/format";
+import { ScheduleButtons } from "@/components/schedule-dialog";
 
 export interface ConversationItem {
   contact_id: string;
@@ -32,7 +33,10 @@ export function ConversationList({
   selectedId,
   tagLinks,
   numberLinks = [],
+  canSchedule = false,
 }: {
+  /** Mostra "Agendar" e "Rodízio" em cada conversa (permissão de enviar). */
+  canSchedule?: boolean;
   items: ConversationItem[];
   selectedId: string | null;
   tagLinks: { id: string | null; name: string; color?: string; href: string; active: boolean }[];
@@ -102,12 +106,11 @@ export function ConversationList({
         {filtered.map((c) => {
           const active = c.contact_id === selectedId;
           return (
-            <li key={c.contact_id}>
+            <li key={c.contact_id} className="flex items-center transition hover:bg-[var(--wa-active)]" style={active ? { background: "var(--wa-active)" } : undefined}>
               <Link
                 href={c.href}
                 aria-current={active ? "true" : undefined}
-                className="flex items-center gap-3 px-3 transition hover:bg-[var(--wa-active)]"
-                style={active ? { background: "var(--wa-active)" } : undefined}
+                className="flex min-w-0 flex-1 items-center gap-3 pl-3"
               >
                 <Avatar name={c.name} url={c.avatar_url} size={49} />
                 <span className="min-w-0 flex-1 border-b border-line/70 py-3">
@@ -130,6 +133,11 @@ export function ConversationList({
                   )}
                 </span>
               </Link>
+              {canSchedule && c.phone && (
+                <span className="self-stretch border-b border-line/70 pr-2">
+                  <span className="flex h-full items-center"><ScheduleButtons contactId={c.contact_id} name={c.name} compact /></span>
+                </span>
+              )}
             </li>
           );
         })}

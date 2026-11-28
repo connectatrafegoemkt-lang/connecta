@@ -166,6 +166,7 @@ export default async function WhatsappPage({ searchParams }: PageProps<"/whatsap
             />
           )}
           <ConversationList
+            canSchedule={can(ctx, "whatsapp.enviar")}
             selectedId={contact?.id ?? null}
             tagLinks={tagLinks}
             numberLinks={numberLinks}
