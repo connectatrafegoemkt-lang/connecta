@@ -8,6 +8,7 @@ import { HttpError } from "@/server/errors";
 import { MobileNav, SideNav } from "@/components/nav-link";
 import { LogoMark, Wordmark } from "@/components/logo";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { LiveAlerts, SoundToggle } from "@/components/live-alerts";
 import { currentTheme } from "@/lib/theme";
 
 function initials(name: string | null) {
@@ -113,8 +114,9 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
           </Link>
         )}
 
-        <div className="mt-auto flex justify-center pb-3">
+        <div className="mt-auto flex items-center justify-center gap-2 pb-3">
           <ThemeToggle initial={theme} />
+          {can(ctx, "whatsapp.ver") && <SoundToggle />}
         </div>
         <div className="rounded-2xl border border-line bg-surface-2/60 p-3">
           <div className="flex items-center gap-3">
@@ -141,6 +143,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
+        <LiveAlerts enabled={can(ctx, "whatsapp.ver")} />
         <header className="sticky top-0 z-20 border-b border-line bg-page/85 px-3 pb-2 pt-3 backdrop-blur-xl md:hidden">
           <div className="mb-2 flex items-center justify-between px-1">
             <div className="flex items-center gap-2">
@@ -149,6 +152,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
             </div>
             <div className="flex items-center gap-1">
             <ThemeToggle initial={theme} compact />
+            {can(ctx, "whatsapp.ver") && <SoundToggle />}
             {platform && (
               <Link href="/plataforma" className="icon-btn" title="Painel da CONNECTA" aria-label="Painel da CONNECTA">
                 <LayoutGrid className="h-4 w-4" />
