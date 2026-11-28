@@ -2,6 +2,7 @@ import "server-only";
 import { can, requirePerm, type TenantContext } from "../context";
 import { badRequest, fromDbError, notFound } from "../errors";
 import { signedUrlsFor } from "./whatsapp-media";
+import { displayName } from "@/shared/contact-name";
 
 export interface WhatsappSession {
   status: "desconectado" | "aguardando_qr" | "conectando" | "conectado" | "erro";
@@ -182,7 +183,7 @@ export async function listConversations(
   let q = ctx.db
     .select(
       "interactions",
-      "contact_id, body, direction, status, occurred_at, session_id, contacts(name, phone, avatar_path, whatsapp_about, contact_tags(tags(id, name, color)))",
+      "contact_id, body, direction, status, occurred_at, session_id, contacts(name, phone, whatsapp_name, avatar_path, whatsapp_about, contact_tags(tags(id, name, color)))",
     )
     .eq("type", "whatsapp");
   if (opts.sessionId) q = q.eq("session_id", opts.sessionId);
@@ -199,6 +200,7 @@ export async function listConversations(
     contacts: {
       name: string;
       phone: string | null;
+      whatsapp_name: string | null;
       avatar_path: string | null;
       whatsapp_about: string | null;
       contact_tags?: { tags: { id: string; name: string; color: string } | null }[];
@@ -209,7 +211,7 @@ export async function listConversations(
     if (opts.tagId && !tags.some((t) => t.id === opts.tagId)) continue;
     seen.set(r.contact_id, {
       contact_id: r.contact_id,
-      name: r.contacts?.name ?? "Contato",
+      name: r.contacts ? displayName(r.contacts) : "Contato",
       phone: r.contacts?.phone ?? null,
       tags,
       last_at: r.occurred_at,

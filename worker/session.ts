@@ -11,7 +11,7 @@ import type { CredentialCipher } from "./crypto";
 import { ackToStatus, handleIncoming, type IncomingMessage } from "./inbound";
 import { recoverStuckOutbox } from "./outbox-recovery";
 import { refreshContactProfile } from "./profile";
-import { phoneToJid, jidToPhone } from "./phone";
+import { phoneCandidates, phoneToJid, jidToPhone } from "./phone";
 import { describeMedia, extFromMime, MAX_MEDIA_BYTES, safeName, toOggOpus, type MediaMeta } from "./media";
 import type { WorkerTenantRepo } from "./repo";
 import type { ChatClient } from "../src/shared/ai/agent";
@@ -176,10 +176,10 @@ export class TenantSession {
                     .catch((e) => this.log.warn({ err: e }, "falha ao marcar lead de anúncio"));
                 }
               }
-              if (!live) return;
-              const jid = (m as { key?: { remoteJid?: string | null } }).key?.remoteJid;
               const push = (m as { pushName?: string | null }).pushName?.trim();
               if (!fromMe && push) void this.repo.setContactWhatsappName(contactId, push).catch(() => undefined);
+              if (!live) return;
+              const jid = (m as { key?: { remoteJid?: string | null } }).key?.remoteJid;
               if (jid) void this.refreshProfile(contactId, jid);
               // Mensagem enviada pelo celular por uma pessoa = humano assumiu.
               if (fromMe) void this.ai.pauseForHuman(contactId).catch(() => undefined);
@@ -217,6 +217,13 @@ export class TenantSession {
       }
     });
 
+    // Nomes que as pessoas usam no WhatsApp (sincronização de contatos):
+    // completa os contatos que existem no CRM só com o telefone.
+    const onContacts = (list: unknown[]) =>
+      void this.saveWhatsappNames(list).catch((e) => this.log.warn({ err: e }, "falha ao salvar nomes do WhatsApp"));
+    sock.ev.on("contacts.upsert", onContacts);
+    sock.ev.on("contacts.update", onContacts);
+
     sock.ev.on("messages.update", async (updates) => {
       for (const { key, update } of updates) {
         const status = ackToStatus(update.status as number | undefined);
@@ -225,6 +232,19 @@ export class TenantSession {
         }
       }
     });
+  }
+
+  private async saveWhatsappNames(list: unknown[]) {
+    for (const raw of list.slice(0, 2000)) {
+      if (this.stopped) return;
+      const c = raw as { id?: string; phoneNumber?: string; notify?: string | null; verifiedName?: string | null };
+      const name = (c.notify || c.verifiedName || "").trim();
+      if (!name) continue;
+      const phone = jidToPhone(c.phoneNumber) ?? jidToPhone(c.id);
+      if (!phone) continue;
+      const found = await this.repo.findContactByPhones(phoneCandidates(phone));
+      if (found) await this.repo.setContactWhatsappName(found.id, name);
+    }
   }
 
   /** Baixa a mídia recebida e guarda em <tenant>/whatsapp/<contato>/. */
