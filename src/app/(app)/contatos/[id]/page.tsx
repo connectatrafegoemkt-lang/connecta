@@ -44,6 +44,7 @@ import {
   updateContactAction,
 } from "../../actions";
 import { LiveTimeline } from "./live-timeline";
+import { displayName } from "@/shared/contact-name";
 
 const TYPE_ICON: Record<string, LucideIcon> = {
   nota: StickyNote,
@@ -80,7 +81,8 @@ export default async function ContatoPage({ params }: PageProps<"/contatos/[id]"
   const tagSet = new Set(contact.tags?.map((t) => t.id));
   const memberName = new Map(members.map((m) => [m.user_id, m.display_name ?? "Usuário"]));
   const stage = stages.find((s) => s.id === contact.stage_id);
-  const initials = contact.name.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]!.toUpperCase()).join("");
+  const shownName = displayName(contact);
+  const initials = shownName.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]!.toUpperCase()).join("");
 
   return (
     <div className="space-y-6">
@@ -94,7 +96,7 @@ export default async function ContatoPage({ params }: PageProps<"/contatos/[id]"
             {initials}
           </span>
           <div>
-            <h1 className="page-title">{contact.name}</h1>
+            <h1 className="page-title">{shownName}</h1>
             <div className="mt-1.5 flex flex-wrap items-center gap-2 text-sm text-muted">
               {contact.phone && <span className="chip"><Phone className="h-3 w-3" /> {phoneFmt(contact.phone)}</span>}
               {contact.email && <span className="chip"><Mail className="h-3 w-3" /> {contact.email}</span>}

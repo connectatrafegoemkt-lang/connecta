@@ -39,6 +39,7 @@ export interface InboundRepo {
 
 import type { AdReferral } from "./ad-referral";
 import type { LabelQueueItem, LabelRepo } from "./labels";
+import { isPlaceholderName } from "../src/shared/contact-name";
 
 /** Um número de WhatsApp do tenant (o principal guarda as chaves sem prefixo). */
 export interface SessionRef {
@@ -305,12 +306,28 @@ export class WorkerTenantRepo implements InboundRepo, LabelRepo {
     if (error) throw error;
   }
 
+  /**
+   * Guarda o nome que a pessoa usa no WhatsApp. Se o contato ainda está só
+   * com o telefone como nome (lead não cadastrada), usa esse nome também
+   * como nome do contato. Nome digitado no CRM nunca é sobrescrito.
+   */
   async setContactWhatsappName(contactId: string, name: string) {
-    const { error } = await this.sb
+    const wa = name.trim().slice(0, 120);
+    if (!wa) return;
+    const cur = await this.sb
       .from("contacts")
-      .update({ whatsapp_name: name.slice(0, 120) })
+      .select("name, phone, whatsapp_name")
       .eq("tenant_id", this.tenantId)
-      .eq("id", contactId);
+      .eq("id", contactId)
+      .maybeSingle();
+    if (cur.error) throw cur.error;
+    if (!cur.data) return;
+    const row = cur.data as { name: string; phone: string | null; whatsapp_name: string | null };
+    const patch: { whatsapp_name?: string; name?: string } = {};
+    if (row.whatsapp_name !== wa) patch.whatsapp_name = wa;
+    if (isPlaceholderName(row.name, row.phone) && row.name !== wa) patch.name = wa;
+    if (!Object.keys(patch).length) return;
+    const { error } = await this.sb.from("contacts").update(patch).eq("tenant_id", this.tenantId).eq("id", contactId);
     if (error) throw error;
   }
 

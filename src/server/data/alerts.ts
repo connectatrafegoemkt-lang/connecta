@@ -2,6 +2,7 @@ import type { TenantContext } from "../context";
 import { can } from "../context";
 import { fromDbError } from "../errors";
 import { listWhatsappNumbers } from "./whatsapp";
+import { displayName } from "@/shared/contact-name";
 
 export interface AlertsPayload {
   numbers: { id: string; label: string; status: string; desired_state: string; last_error: string | null }[];
@@ -18,18 +19,18 @@ export async function getAlerts(ctx: TenantContext): Promise<AlertsPayload> {
   const [nums, last] = await Promise.all([
     listWhatsappNumbers(ctx),
     ctx.db
-      .select("interactions", "id, occurred_at, body, contact_id, contacts(name)")
+      .select("interactions", "id, occurred_at, body, contact_id, contacts(name, phone, whatsapp_name)")
       .eq("type", "whatsapp")
       .eq("direction", "entrada")
       .order("occurred_at", { ascending: false })
       .limit(1),
   ]);
   if (last.error) throw fromDbError(last.error);
-  const row = (last.data as unknown as { id: string; occurred_at: string; body: string; contact_id: string; contacts: { name: string } | null }[] | null)?.[0];
+  const row = (last.data as unknown as { id: string; occurred_at: string; body: string; contact_id: string; contacts: { name: string; phone: string | null; whatsapp_name: string | null } | null }[] | null)?.[0];
   return {
     numbers: nums.map((n) => ({ id: n.id, label: n.label, status: n.status, desired_state: n.desired_state, last_error: n.last_error })),
     lastInbound: row
-      ? { id: row.id, at: row.occurred_at, contact_id: row.contact_id, contact: row.contacts?.name ?? "Contato", preview: (row.body || "Nova mensagem").slice(0, 120) }
+      ? { id: row.id, at: row.occurred_at, contact_id: row.contact_id, contact: row.contacts ? displayName(row.contacts) : "Contato", preview: (row.body || "Nova mensagem").slice(0, 120) }
       : null,
   };
 }

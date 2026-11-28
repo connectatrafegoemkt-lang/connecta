@@ -30,6 +30,7 @@ import { TagPicker } from "./tag-picker";
 import { ConversationList } from "./conversation-list";
 import { LeadDrawer } from "./lead-drawer";
 import { NumbersManager } from "./numbers-manager";
+import { displayName } from "@/shared/contact-name";
 
 export const metadata = { title: "WhatsApp" };
 
@@ -178,7 +179,7 @@ export default async function WhatsappPage({ searchParams }: PageProps<"/whatsap
             <>
               <header className="flex h-[3.75rem] items-center gap-3 border-l border-line/40 px-4" style={{ background: "var(--wa-panel)" }}>
                 <a href={qs({ contato: undefined })} className="icon-btn md:hidden" aria-label="Voltar para as conversas"><ArrowLeft className="h-5 w-5" /></a>
-                <Avatar name={contact.name} url={avatarUrl} size={40} zoomable />
+                <Avatar name={displayName(contact)} url={avatarUrl} size={40} zoomable />
                 <LeadDrawer
                   subtitle={contact.whatsapp_about || phoneFmt(contact.phone)}
                   actions={
@@ -196,7 +197,7 @@ export default async function WhatsappPage({ searchParams }: PageProps<"/whatsap
                   }
                   contact={{
                     id: contact.id,
-                    name: contact.name,
+                    name: displayName(contact),
                     phone: contact.phone,
                     email: contact.email,
                     company: contact.company,
