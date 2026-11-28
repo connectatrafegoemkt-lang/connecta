@@ -15,6 +15,7 @@ import { brl, dateTime, phoneFmt } from "@/components/format";
 import { createContactAction } from "../actions";
 import { listContactFields } from "@/server/data/contact-fields";
 import { CustomFieldInputs } from "@/components/custom-field-inputs";
+import { ScheduleButtons } from "@/components/schedule-dialog";
 
 export const metadata = { title: "Contatos" };
 
@@ -26,6 +27,7 @@ export default async function ContatosPage({ searchParams }: PageProps<"/contato
   const ctx = await getTenantContext();
   if (!can(ctx, "contatos.ver")) redirect(can(ctx, "whatsapp.ver") ? "/whatsapp" : "/dashboard");
   const canEdit = can(ctx, "contatos.editar");
+  const canSchedule = can(ctx, "whatsapp.enviar");
   const allSectors = can(ctx, "setores.todos");
   const sp = await searchParams;
   const str = (v: unknown) => (typeof v === "string" && v ? v : undefined);
@@ -138,7 +140,8 @@ export default async function ContatosPage({ searchParams }: PageProps<"/contato
                   return (
                     <tr key={c.id} className="transition hover:bg-surface-2/60">
                       <td className="px-5 py-3">
-                        <Link href={`/contatos/${c.id}`} className="flex items-center gap-3">
+                        <div className="flex items-center gap-2">
+                        <Link href={`/contatos/${c.id}`} className="flex min-w-0 flex-1 items-center gap-3">
                           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent-soft text-accent-strong text-xs font-semibold">
                             {initials(c.name)}
                           </span>
@@ -147,6 +150,8 @@ export default async function ContatosPage({ searchParams }: PageProps<"/contato
                             {c.company && <span className="block text-xs text-muted">{c.company}</span>}
                           </span>
                         </Link>
+                        {canSchedule && c.phone && <ScheduleButtons contactId={c.id} name={c.name} compact />}
+                        </div>
                       </td>
                       <td className="whitespace-nowrap px-5 py-3 text-muted">{phoneFmt(c.phone)}</td>
                       <td className="px-5 py-3">
